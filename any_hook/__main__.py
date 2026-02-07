@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
+from typing import Literal
 
 import libcst
+from any_hook._file_data import FileData
 from any_hook._transaction import transaction
 from any_hook.files_modifiers import AnyModifier
-from any_hook.files_modifiers._modifier import FileData
 from pydantic import Field
 from pydantic_settings import BaseSettings
 from pydantic_settings import CliPositionalArg
@@ -18,10 +18,9 @@ class Main(BaseSettings):
         cli_parse_args=True,
     )
     paths: CliPositionalArg[list[Path]] = Field(default_factory=list)
-    root: Path = Field(default_factory=lambda: Path(os.getcwd()))
     modifiers: list[AnyModifier] = Field(min_length=1)
 
-    def __call__(self) -> int:
+    def cli_cmd(self) -> Literal[0, 1]:
         with transaction(self.paths) as (paths, contents):
             files_data = tuple(
                 map(

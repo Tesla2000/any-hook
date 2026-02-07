@@ -1,0 +1,127 @@
+from textwrap import dedent
+from unittest import TestCase
+
+from any_hook.files_modifiers.object_to_any import _ObjectToAnyTransformer
+from libcst import parse_module
+
+
+class TestObjectToAny(TestCase):
+    def test_simple_object_annotation(self):
+        code = "def foo(x: object) -> object:\n    return x"
+        expected = "def foo(x: Any) -> Any:\n    return x"
+        self._assert_transformation(code, expected)
+
+    def test_object_in_list(self):
+        code = "def foo(x: list[object]) -> list[object]:\n    return x"
+        expected = "def foo(x: list[Any]) -> list[Any]:\n    return x"
+        self._assert_transformation(code, expected)
+
+    def test_object_in_dict(self):
+        code = "def foo(x: dict[str, object]) -> dict[object, object]:\n    return x"
+        expected = (
+            "def foo(x: dict[str, Any]) -> dict[Any, Any]:\n    return x"
+        )
+        self._assert_transformation(code, expected)
+
+    def test_object_in_union(self):
+        code = "def foo(x: Union[object, str]) -> Union[int, object]:\n    return x"
+        expected = (
+            "def foo(x: Union[Any, str]) -> Union[int, Any]:\n    return x"
+        )
+        self._assert_transformation(code, expected)
+
+    def test_nested_object(self):
+        code = "def foo(x: list[dict[str, object]]) -> tuple[object, ...]:\n    return x"
+        expected = "def foo(x: list[dict[str, Any]]) -> tuple[Any, ...]:\n    return x"
+        self._assert_transformation(code, expected)
+
+    def test_object_in_class_variable(self):
+        code = dedent("""
+            class Foo:
+                x: object
+                y: list[object]
+        """).lstrip()
+        expected = dedent("""
+            class Foo:
+                x: Any
+                y: list[Any]
+        """).lstrip()
+        self._assert_transformation(code, expected)
+
+    def test_multiple_occurrences(self):
+        code = dedent("""
+            def foo(a: object, b: list[object], c: dict[object, object]) -> object:
+                return a
+        """).lstrip()
+        expected = dedent("""
+            def foo(a: Any, b: list[Any], c: dict[Any, Any]) -> Any:
+                return a
+        """).lstrip()
+        self._assert_transformation(code, expected)
+
+    def test_callable_with_object(self):
+        code = "def foo(x: Callable[[object], object]) -> None:\n    pass"
+        expected = "def foo(x: Callable[[Any], Any]) -> None:\n    pass"
+        self._assert_transformation(code, expected)
+
+    def test_optional_object(self):
+        code = "def foo(x: Optional[object]) -> object | None:\n    return x"
+        expected = "def foo(x: Optional[Any]) -> Any | None:\n    return x"
+        self._assert_transformation(code, expected)
+
+    def test_object_constructor_not_changed(self):
+        code = "foo = object()"
+        self._assert_no_transformation(code)
+
+    def test_object_as_base_class_not_changed(self):
+        code = "class Foo(object):\n    pass"
+        self._assert_no_transformation(code)
+
+    def test_object_as_variable_not_changed(self):
+        code = "x = object\ny = object"
+        self._assert_no_transformation(code)
+
+    def test_isinstance_with_object_not_changed(self):
+        code = "if isinstance(x, object):\n    pass"
+        self._assert_no_transformation(code)
+
+    def test_mixed_usage(self):
+        code = dedent("""
+            class Foo(object):
+                x: object
+                def bar(self, y: object) -> object:
+                    z = object()
+                    return y
+        """).lstrip()
+        expected = dedent("""
+            class Foo(object):
+                x: Any
+                def bar(self, y: Any) -> Any:
+                    z = object()
+                    return y
+        """).lstrip()
+        self._assert_transformation(code, expected)
+
+    def test_object_in_type_alias(self):
+        code = "MyType = dict[str, object]"
+        expected = "MyType = dict[str, Any]"
+        self._assert_transformation(code, expected)
+
+    def test_no_type_hints(self):
+        code = dedent("""
+            def foo(x):
+                return x
+            class Bar:
+                pass
+        """).lstrip()
+        self._assert_no_transformation(code)
+
+    def _assert_transformation(self, original: str, expected: str) -> None:
+        module = parse_module(original)
+        transformer = _ObjectToAnyTransformer()
+        transformed = module.visit(transformer)
+        result = transformed.code
+        self.assertEqual(result, expected)
+
+    def _assert_no_transformation(self, code: str) -> None:
+        self._assert_transformation(code, code)
