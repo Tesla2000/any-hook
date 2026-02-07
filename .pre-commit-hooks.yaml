@@ -1,0 +1,7 @@
+-   id: any-hook
+    name: any-hook
+    description: Group of pre-commit hooks of various purposes
+    entry: any-hook
+    language: python
+    types: [python]
+    files: ''
