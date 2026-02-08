@@ -22,9 +22,14 @@ from libcst.helpers import get_absolute_module_for_import
 
 
 class _StrEnumInheritanceTransformer(CSTTransformer):
-    def __init__(self, convert_to_auto: bool = False) -> None:
+    def __init__(
+        self,
+        convert_to_auto: bool = False,
+        convert_existing_str_enum: bool = False,
+    ) -> None:
         super().__init__()
         self._convert_to_auto = convert_to_auto
+        self._convert_existing_str_enum = convert_existing_str_enum
         self._made_changes = False
         self._has_str_enum_import = False
         self._has_auto_import = False
@@ -48,14 +53,22 @@ class _StrEnumInheritanceTransformer(CSTTransformer):
         return False
 
     def visit_ClassDef(self, node: ClassDef) -> bool:
-        if not node.bases or len(node.bases) != 2:
+        if not node.bases:
             return True
-        base_values = []
-        for base in node.bases:
-            if not isinstance(base.value, Name):
-                return True
-            base_values.append(base.value.value)
-        if set(base_values) == {str.__name__, enum.Enum.__name__}:
+        if len(node.bases) == 2:
+            base_values = []
+            for base in node.bases:
+                if not isinstance(base.value, Name):
+                    return True
+                base_values.append(base.value.value)
+            if set(base_values) == {str.__name__, enum.Enum.__name__}:
+                self._in_str_enum_class = True
+        elif (
+            len(node.bases) == 1
+            and self._convert_existing_str_enum
+            and isinstance(node.bases[0].value, Name)
+            and node.bases[0].value.value == enum.StrEnum.__name__
+        ):
             self._in_str_enum_class = True
         return True
 
@@ -91,6 +104,7 @@ class _StrEnumInheritanceTransformer(CSTTransformer):
         member_name = target.target.value
         string_value = updated_node.value.value.strip("\"'")
         if string_value == member_name.lower():
+            self._made_changes = True
             self._needs_auto_import = True
             return updated_node.with_changes(
                 value=Call(func=Name(enum.auto.__name__))
@@ -111,6 +125,7 @@ class _StrEnumInheritanceTransformer(CSTTransformer):
         member_name = updated_node.target.value
         string_value = updated_node.value.value.strip("\"'")
         if string_value == member_name.lower():
+            self._made_changes = True
             self._needs_auto_import = True
             return updated_node.with_changes(
                 value=Call(func=Name(enum.auto.__name__))
@@ -204,16 +219,23 @@ class _StrEnumInheritanceTransformer(CSTTransformer):
 class StrEnumInheritance(SeparateModifier[_StrEnumInheritanceTransformer]):
     type: Literal["str-enum-inheritance"] = "str-enum-inheritance"
     convert_to_auto: bool = False
+    convert_existing_str_enum: bool = False
 
     def _create_transformer(self) -> _StrEnumInheritanceTransformer:
         return _StrEnumInheritanceTransformer(
-            convert_to_auto=self.convert_to_auto
+            convert_to_auto=self.convert_to_auto,
+            convert_existing_str_enum=self.convert_existing_str_enum,
         )
 
     def _modify_file(self, file_data: FileData) -> bool:
-        if (
-            enum.Enum.__name__ not in file_data.content
-            or str.__name__ not in file_data.content
-        ):
+        has_str_enum_target = (
+            enum.Enum.__name__ in file_data.content
+            and str.__name__ in file_data.content
+        )
+        has_existing_str_enum = (
+            self.convert_existing_str_enum
+            and enum.StrEnum.__name__ in file_data.content
+        )
+        if not (has_str_enum_target or has_existing_str_enum):
             return False
         return super()._modify_file(file_data)

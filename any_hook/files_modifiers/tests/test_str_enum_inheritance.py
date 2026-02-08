@@ -574,3 +574,145 @@ class TestStrEnumInheritance(TestCase):
             result = modifier.modify([file_data])
             self.assertTrue(result)
             self.assertEqual(file_path.read_text(), expected_code)
+
+    def test_converts_existing_str_enum_to_auto(self):
+        original_code = dedent("""
+            from enum import StrEnum
+
+            class Status(StrEnum):
+                ACTIVE = "active"
+                PENDING = "pending"
+        """).strip()
+        expected_code = dedent("""
+            from enum import StrEnum, auto
+
+            class Status(StrEnum):
+                ACTIVE = auto()
+                PENDING = auto()
+        """).strip()
+        with TemporaryDirectory() as temp_dir:
+            file_path = Path(temp_dir) / "test.py"
+            file_path.write_text(original_code)
+            file_data = FileData(
+                path=file_path,
+                content=original_code,
+                module=parse_module(original_code),
+            )
+            modifier = StrEnumInheritance(
+                convert_to_auto=True, convert_existing_str_enum=True
+            )
+            result = modifier.modify([file_data])
+            self.assertTrue(result)
+            self.assertEqual(file_path.read_text(), expected_code)
+
+    def test_does_not_convert_existing_str_enum_when_flag_disabled(self):
+        original_code = dedent("""
+            from enum import StrEnum
+
+            class Status(StrEnum):
+                ACTIVE = "active"
+                PENDING = "pending"
+        """).strip()
+        with TemporaryDirectory() as temp_dir:
+            file_path = Path(temp_dir) / "test.py"
+            file_path.write_text(original_code)
+            file_data = FileData(
+                path=file_path,
+                content=original_code,
+                module=parse_module(original_code),
+            )
+            modifier = StrEnumInheritance(
+                convert_to_auto=True, convert_existing_str_enum=False
+            )
+            result = modifier.modify([file_data])
+            self.assertFalse(result)
+            self.assertEqual(file_path.read_text(), original_code)
+
+    def test_converts_existing_str_enum_with_mixed_values(self):
+        original_code = dedent("""
+            from enum import StrEnum
+
+            class Status(StrEnum):
+                ACTIVE = "active"
+                CUSTOM = "custom_status"
+                PENDING = "pending"
+        """).strip()
+        expected_code = dedent("""
+            from enum import StrEnum, auto
+
+            class Status(StrEnum):
+                ACTIVE = auto()
+                CUSTOM = "custom_status"
+                PENDING = auto()
+        """).strip()
+        with TemporaryDirectory() as temp_dir:
+            file_path = Path(temp_dir) / "test.py"
+            file_path.write_text(original_code)
+            file_data = FileData(
+                path=file_path,
+                content=original_code,
+                module=parse_module(original_code),
+            )
+            modifier = StrEnumInheritance(
+                convert_to_auto=True, convert_existing_str_enum=True
+            )
+            result = modifier.modify([file_data])
+            self.assertTrue(result)
+            self.assertEqual(file_path.read_text(), expected_code)
+
+    def test_converts_both_new_and_existing_str_enum(self):
+        original_code = dedent("""
+            from enum import Enum, StrEnum
+
+            class ExistingStrEnum(StrEnum):
+                ACTIVE = "active"
+
+            class NewStrEnum(str, Enum):
+                PENDING = "pending"
+        """).strip()
+        expected_code = dedent("""
+            from enum import StrEnum, auto
+
+            class ExistingStrEnum(StrEnum):
+                ACTIVE = auto()
+
+            class NewStrEnum(StrEnum):
+                PENDING = auto()
+        """).strip()
+        with TemporaryDirectory() as temp_dir:
+            file_path = Path(temp_dir) / "test.py"
+            file_path.write_text(original_code)
+            file_data = FileData(
+                path=file_path,
+                content=original_code,
+                module=parse_module(original_code),
+            )
+            modifier = StrEnumInheritance(
+                convert_to_auto=True, convert_existing_str_enum=True
+            )
+            result = modifier.modify([file_data])
+            self.assertTrue(result)
+            self.assertEqual(file_path.read_text(), expected_code)
+
+    def test_existing_str_enum_without_convert_to_auto(self):
+        original_code = dedent("""
+            from enum import StrEnum
+
+            class Status(StrEnum):
+                ACTIVE = "active"
+                PENDING = "pending"
+        """).strip()
+        with TemporaryDirectory() as temp_dir:
+            file_path = Path(temp_dir) / "test.py"
+            file_path.write_text(original_code)
+            file_data = FileData(
+                path=file_path,
+                content=original_code,
+                module=parse_module(original_code),
+            )
+            modifier = StrEnumInheritance(
+                convert_to_auto=False, convert_existing_str_enum=True
+            )
+            result = modifier.modify([file_data])
+            self.assertFalse(result)
+            self.assertEqual(file_path.read_text(), original_code)
