@@ -6,7 +6,18 @@ from typing import Literal
 import yaml
 from any_hook._file_data import FileData
 from any_hook.files_modifiers._modifier import Modifier
+from pydantic import BaseModel
 from pydantic import Field
+
+
+class _EnvFileState(BaseModel):
+    env_vars: dict[str, dict[str, str]] = Field(default_factory=dict)
+    existing_content: str = ""
+    existing_vars: set[str] = Field(default_factory=set)
+    source_sections: dict[str, int] = Field(default_factory=dict)
+    existing_source_vars: dict[str, list[str]] = Field(default_factory=dict)
+    new_source_sections: dict[str, list[str]] = Field(default_factory=dict)
+    added_vars: set[str] = Field(default_factory=set)
 
 
 class WorkflowEnvToExample(Modifier):
@@ -18,25 +29,27 @@ class WorkflowEnvToExample(Modifier):
         default=Path(".env.example"),
         description="Path to the .env.example file to write to",
     )
+    source_comment_prefix: str = Field(
+        default="# From: ",
+        description="Prefix used for source comments in the output file",
+    )
 
     def modify(self, _: Iterable[FileData]) -> bool:
-        env_vars = self._collect_env_vars_from_workflows()
-        if not env_vars:
+        state = _EnvFileState()
+        self._collect_env_vars_from_workflows(state)
+        if not state.env_vars:
             return False
-        existing_content, existing_vars = self._read_existing_env_file()
-        new_sections, added_vars = self._build_new_sections(
-            env_vars, existing_vars
-        )
-        if not new_sections:
+        self._read_existing_env_file(state)
+        self._build_new_sections(state)
+        if not state.existing_source_vars and not state.new_source_sections:
             return False
-        self._write_updated_env_file(existing_content, new_sections)
+        self._write_updated_env_file(state)
         self._output(
-            f"Updated {self.output_path} with {len(added_vars)} new environment variable(s)"
+            f"Updated {self.output_path} with {len(state.added_vars)} new environment variable(s)"
         )
         return True
 
-    def _collect_env_vars_from_workflows(self) -> dict[str, dict[str, str]]:
-        env_vars: dict[str, dict[str, str]] = {}
+    def _collect_env_vars_from_workflows(self, state: _EnvFileState) -> None:
         for workflow_path in self.workflow_paths:
             if not workflow_path.exists():
                 raise FileNotFoundError(
@@ -48,48 +61,66 @@ class WorkflowEnvToExample(Modifier):
                 continue
             source_envs = self._extract_env_vars(workflow_data)
             if source_envs:
-                env_vars[source_name] = source_envs
-        return env_vars
+                state.env_vars[source_name] = source_envs
 
-    def _read_existing_env_file(self) -> tuple[str, set[str]]:
-        existing_content = ""
-        existing_vars: set[str] = set()
-        if self.output_path.exists():
-            existing_content = self.output_path.read_text()
-            for line in existing_content.splitlines():
-                if "=" in line and not line.strip().startswith("#"):
-                    var_name = line.split("=")[0].strip()
-                    existing_vars.add(var_name)
-        return existing_content, existing_vars
+    def _read_existing_env_file(self, state: _EnvFileState) -> None:
+        if not self.output_path.exists():
+            return
+        state.existing_content = self.output_path.read_text()
+        lines = state.existing_content.splitlines()
+        for idx, line in enumerate(lines):
+            stripped = line.strip()
+            if stripped.startswith(self.source_comment_prefix):
+                source = stripped.removeprefix(self.source_comment_prefix)
+                state.source_sections[source] = idx
+            elif "=" in line and not stripped.startswith("#"):
+                var_name = line.split("=")[0].strip()
+                state.existing_vars.add(var_name)
 
-    @staticmethod
-    def _build_new_sections(
-        env_vars: dict[str, dict[str, str]], existing_vars: set[str]
-    ) -> tuple[list[str], set[str]]:
-        new_sections: list[str] = []
-        added_vars: set[str] = set()
-        for source, vars_dict in env_vars.items():
+    def _build_new_sections(self, state: _EnvFileState) -> None:
+        for source, vars_dict in state.env_vars.items():
             section_vars: list[str] = []
             for var_name, var_value in vars_dict.items():
                 if (
-                    var_name not in existing_vars
-                    and var_name not in added_vars
+                    var_name not in state.existing_vars
+                    and var_name not in state.added_vars
                 ):
                     section_vars.append(f"{var_name}={var_value}")
-                    added_vars.add(var_name)
+                    state.added_vars.add(var_name)
             if section_vars:
-                new_sections.append(f"# From: {source}")
-                new_sections.extend(section_vars)
-                new_sections.append("")
-        return new_sections, added_vars
+                if source in state.source_sections:
+                    state.existing_source_vars[source] = section_vars
+                else:
+                    state.new_source_sections[source] = section_vars
 
-    def _write_updated_env_file(
-        self, existing_content: str, new_sections: list[str]
-    ) -> None:
-        final_content = existing_content.rstrip()
-        if final_content:
-            final_content += "\n\n"
-        final_content += "\n".join(new_sections)
+    def _write_updated_env_file(self, state: _EnvFileState) -> None:
+        content = state.existing_content
+        if state.existing_source_vars:
+            lines = content.splitlines()
+            for source, vars_to_add in state.existing_source_vars.items():
+                section_idx = state.source_sections[source]
+                insert_idx = section_idx + 1
+                while (
+                    insert_idx < len(lines)
+                    and lines[insert_idx].strip()
+                    and not lines[insert_idx].strip().startswith("#")
+                ):
+                    insert_idx += 1
+                for var_line in reversed(vars_to_add):
+                    lines.insert(insert_idx, var_line)
+            content = "\n".join(lines)
+        final_content = content.rstrip()
+        if state.new_source_sections:
+            if final_content:
+                final_content += "\n\n"
+            new_sections_lines: list[str] = []
+            for source, vars_list in state.new_source_sections.items():
+                new_sections_lines.append(
+                    f"{self.source_comment_prefix}{source}"
+                )
+                new_sections_lines.extend(vars_list)
+                new_sections_lines.append("")
+            final_content += "\n".join(new_sections_lines)
         self.output_path.write_text(final_content)
 
     def _extract_env_vars(self, data: Any) -> dict[str, str]:

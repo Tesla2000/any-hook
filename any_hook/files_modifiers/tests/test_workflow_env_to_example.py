@@ -100,6 +100,30 @@ class TestWorkflowEnvToExample(TestCase):
             self.assertEqual(content.count("DATABASE_URL"), 1)
             self.assertIn("NEW_VAR=new_value", content)
 
+    def test_section_append(self):
+        with TemporaryDirectory() as tmpdir:
+            tmpdir_path = Path(tmpdir)
+            workflow_file = tmpdir_path / "workflow.yml"
+            workflow_file.write_text(dedent("""
+                name: Test
+                env:
+                  DATABASE_URL: postgres://localhost/test
+                  NEW_VAR: new_value
+            """))
+            output_file = tmpdir_path / ".env.example"
+            output_file.write_text(
+                f"# From: {workflow_file}\nDATABASE_URL=existing_value\n"
+            )
+            modifier = WorkflowEnvToExample(
+                workflow_paths=(workflow_file,), output_path=output_file
+            )
+            result = modifier.modify([])
+            self.assertTrue(result)
+            content = output_file.read_text()
+            self.assertEqual(content.count("DATABASE_URL"), 1)
+            self.assertEqual(content.count(str(workflow_file)), 1)
+            self.assertIn("NEW_VAR=new_value", content)
+
     def test_handles_multiple_workflow_files(self):
         with TemporaryDirectory() as tmpdir:
             tmpdir_path = Path(tmpdir)
