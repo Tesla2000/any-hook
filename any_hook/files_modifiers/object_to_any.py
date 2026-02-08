@@ -3,6 +3,7 @@ from collections.abc import Sequence
 from typing import Any
 from typing import Literal
 
+from any_hook._file_data import FileData
 from any_hook.files_modifiers.separate_modifier import SeparateModifier
 from libcst import Annotation
 from libcst import CSTTransformer
@@ -111,3 +112,8 @@ class ObjectToAny(SeparateModifier[_ObjectToAnyTransformer]):
 
     def _create_transformer(self) -> _ObjectToAnyTransformer:
         return _ObjectToAnyTransformer()
+
+    def _modify_file(self, file_data: FileData) -> bool:
+        if object.__name__ not in file_data.content:
+            return False
+        return super()._modify_file(file_data)
