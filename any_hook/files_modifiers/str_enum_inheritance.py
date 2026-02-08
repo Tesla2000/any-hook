@@ -218,8 +218,8 @@ class _StrEnumInheritanceTransformer(CSTTransformer):
 
 class StrEnumInheritance(SeparateModifier[_StrEnumInheritanceTransformer]):
     type: Literal["str-enum-inheritance"] = "str-enum-inheritance"
-    convert_to_auto: bool = False
-    convert_existing_str_enum: bool = False
+    convert_to_auto: bool = True
+    convert_existing_str_enum: bool = True
 
     def _create_transformer(self) -> _StrEnumInheritanceTransformer:
         return _StrEnumInheritanceTransformer(

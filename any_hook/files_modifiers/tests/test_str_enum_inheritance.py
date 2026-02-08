@@ -32,7 +32,7 @@ class TestStrEnumInheritance(TestCase):
                 content=original_code,
                 module=parse_module(original_code),
             )
-            modifier = StrEnumInheritance()
+            modifier = StrEnumInheritance(convert_to_auto=False)
             result = modifier.modify([file_data])
             self.assertTrue(result)
             self.assertEqual(file_path.read_text(), expected_code)
@@ -60,7 +60,7 @@ class TestStrEnumInheritance(TestCase):
                 content=original_code,
                 module=parse_module(original_code),
             )
-            modifier = StrEnumInheritance()
+            modifier = StrEnumInheritance(convert_to_auto=False)
             result = modifier.modify([file_data])
             self.assertTrue(result)
             self.assertEqual(file_path.read_text(), expected_code)
@@ -92,7 +92,7 @@ class TestStrEnumInheritance(TestCase):
                 content=original_code,
                 module=parse_module(original_code),
             )
-            modifier = StrEnumInheritance()
+            modifier = StrEnumInheritance(convert_to_auto=False)
             result = modifier.modify([file_data])
             self.assertTrue(result)
             self.assertEqual(file_path.read_text(), expected_code)
@@ -128,7 +128,7 @@ class TestStrEnumInheritance(TestCase):
                 content=original_code,
                 module=parse_module(original_code),
             )
-            modifier = StrEnumInheritance()
+            modifier = StrEnumInheritance(convert_to_auto=False)
             result = modifier.modify([file_data])
             self.assertTrue(result)
             self.assertEqual(file_path.read_text(), expected_code)
@@ -214,7 +214,7 @@ class TestStrEnumInheritance(TestCase):
                 content=original_code,
                 module=parse_module(original_code),
             )
-            modifier = StrEnumInheritance()
+            modifier = StrEnumInheritance(convert_to_auto=False)
             result = modifier.modify([file_data])
             self.assertTrue(result)
             self.assertEqual(file_path.read_text(), expected_code)
@@ -246,7 +246,9 @@ class TestStrEnumInheritance(TestCase):
                 content=original_code,
                 module=parse_module(original_code),
             )
-            modifier = StrEnumInheritance()
+            modifier = StrEnumInheritance(
+                convert_to_auto=False, convert_existing_str_enum=False
+            )
             result = modifier.modify([file_data])
             self.assertTrue(result)
             self.assertEqual(file_path.read_text(), expected_code)
@@ -310,7 +312,7 @@ class TestStrEnumInheritance(TestCase):
                 content=original_code,
                 module=parse_module(original_code),
             )
-            modifier = StrEnumInheritance()
+            modifier = StrEnumInheritance(convert_to_auto=False)
             result = modifier.modify([file_data])
             self.assertTrue(result)
             self.assertEqual(file_path.read_text(), expected_code)
@@ -336,7 +338,7 @@ class TestStrEnumInheritance(TestCase):
                 content=original_code,
                 module=parse_module(original_code),
             )
-            modifier = StrEnumInheritance()
+            modifier = StrEnumInheritance(convert_to_auto=False)
             result = modifier.modify([file_data])
             self.assertTrue(result)
             self.assertEqual(file_path.read_text(), expected_code)
@@ -374,7 +376,7 @@ class TestStrEnumInheritance(TestCase):
                 content=original_code,
                 module=parse_module(original_code),
             )
-            modifier = StrEnumInheritance()
+            modifier = StrEnumInheritance(convert_to_auto=False)
             result = modifier.modify([file_data])
             self.assertTrue(result)
             self.assertEqual(file_path.read_text(), expected_code)

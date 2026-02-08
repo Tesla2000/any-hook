@@ -1,6 +1,7 @@
 from typing import Annotated
 from typing import Union
 
+from any_hook.files_modifiers.forbidden_functions import ForbiddenFunctions
 from any_hook.files_modifiers.local_imports import LocalImports
 from any_hook.files_modifiers.object_to_any import ObjectToAny
 from any_hook.files_modifiers.pydantic_config_to_model_config import (
@@ -17,6 +18,7 @@ AnyModifier = Annotated[
         PydanticV1ToV2,
         StrEnumInheritance,
         LocalImports,
+        ForbiddenFunctions,
     ],
     Field(discriminator="type"),
 ]
@@ -26,6 +28,7 @@ __all__ = [
     "PydanticV1ToV2",
     "StrEnumInheritance",
     "LocalImports",
+    "ForbiddenFunctions",
     "AnyModifier",
 ]
 try:
