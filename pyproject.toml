@@ -1,6 +1,6 @@
 [project]
 name = "any-hook"
-version = "0.1.11"
+version = "0.1.12"
 description = "Group of pre-commit hooks of various purpouses"
 authors = [{name = "Tesla2000", email = "fratajczak124@gmail.com"}]
 readme = "README.md"
