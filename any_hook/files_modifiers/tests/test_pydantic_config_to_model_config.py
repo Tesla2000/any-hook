@@ -220,7 +220,7 @@ class TestPydanticConfigToModelConfig(TestCase):
 
     def _assert_transformation(self, original: str, expected: str) -> None:
         module = parse_module(original)
-        transformer = _PydanticConfigToModelConfigTransformer()
+        transformer = _PydanticConfigToModelConfigTransformer("Config")
         transformed = module.visit(transformer)
         result = transformed.code
         self.assertEqual(result, expected)

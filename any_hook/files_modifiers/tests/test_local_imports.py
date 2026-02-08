@@ -97,8 +97,44 @@ class TestLocalImports(TestCase):
         result = self._check_code(code)
         self.assertTrue(result)
 
+    def test_custom_ignore_pattern(self):
+        code = dedent("""
+            def foo():
+                import os  # noqa
+                return os.path
+        """).lstrip()
+        modifier = LocalImports(ignore_pattern=r"#\s*noqa")
+        result = self._check_code_with_modifier(code, modifier)
+        self.assertFalse(result)
+
+    def test_custom_ignore_pattern_not_matching(self):
+        code = dedent("""
+            def foo():
+                import os  # ignore
+                return os.path
+        """).lstrip()
+        modifier = LocalImports(ignore_pattern=r"#\s*noqa")
+        result = self._check_code_with_modifier(code, modifier)
+        self.assertTrue(result)
+
+    def test_ignore_pattern_case_insensitive(self):
+        code = dedent("""
+            def foo():
+                import os  # IGNORE
+                return os.path
+        """).lstrip()
+        result = self._check_code(code)
+        self.assertFalse(result)
+
     def _check_code(self, code: str) -> bool:
         module = parse_module(code)
         file_data = FileData(path=Path("test.py"), content=code, module=module)
         modifier = LocalImports()
+        return modifier.modify([file_data])
+
+    def _check_code_with_modifier(
+        self, code: str, modifier: LocalImports
+    ) -> bool:
+        module = parse_module(code)
+        file_data = FileData(path=Path("test.py"), content=code, module=module)
         return modifier.modify([file_data])
