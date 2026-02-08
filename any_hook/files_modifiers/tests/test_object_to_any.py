@@ -165,6 +165,21 @@ class TestObjectToAny(TestCase):
         """).lstrip()
         self._assert_transformation(code, expected)
 
+    def test_does_not_duplicate_any_other_import(self):
+        code = dedent("""
+            from typing import Any
+            from typing import List
+            def foo(x: object) -> List[object]:
+                return [x]
+        """).lstrip()
+        expected = dedent("""
+            from typing import Any
+            from typing import List
+            def foo(x: Any) -> List[Any]:
+                return [x]
+        """).lstrip()
+        self._assert_transformation(code, expected)
+
     def test_handles_import_star(self):
         code = dedent("""
             from typing import *

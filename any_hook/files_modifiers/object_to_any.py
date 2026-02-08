@@ -27,13 +27,13 @@ class _ObjectToAnyTransformer(CSTTransformer):
 
     def visit_ImportFrom(self, node: ImportFrom) -> bool:
         module = get_absolute_module_for_import(None, node)
-        if module == typing.__name__:
-            if isinstance(node.names, ImportStar):
-                self._has_any_import = True
-            else:
-                self._has_any_import = any(
-                    alias.name.value == Any.__name__ for alias in node.names
-                )
+        if module != typing.__name__:
+            return False
+        self._has_any_import = (
+            self._has_any_import
+            or isinstance(node.names, ImportStar)
+            or any(alias.name.value == Any.__name__ for alias in node.names)
+        )
         return False
 
     def visit_Annotation(self, _: Annotation) -> bool:
