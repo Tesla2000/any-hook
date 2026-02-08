@@ -33,6 +33,10 @@ class WorkflowEnvToExample(Modifier):
         default="# From: ",
         description="Prefix used for source comments in the output file",
     )
+    ignored_names: tuple[str, ...] = Field(
+        default=(),
+        description="Environment variable names to ignore and not add to .env.example",
+    )
 
     def modify(self, _: Iterable[FileData]) -> bool:
         state = _EnvFileState()
@@ -84,6 +88,7 @@ class WorkflowEnvToExample(Modifier):
                 if (
                     var_name not in state.existing_vars
                     and var_name not in state.added_vars
+                    and var_name not in self.ignored_names
                 ):
                     section_vars.append(f"{var_name}={var_value}")
                     state.added_vars.add(var_name)

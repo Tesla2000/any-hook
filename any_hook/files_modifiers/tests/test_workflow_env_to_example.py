@@ -239,3 +239,27 @@ class TestWorkflowEnvToExample(TestCase):
             self.assertNotIn("${{", content)
             self.assertNotIn("secrets", content)
             self.assertIn("REGULAR_VAR=regular_value", content)
+
+    def test_ignores_specified_names(self):
+        with TemporaryDirectory() as tmpdir:
+            tmpdir_path = Path(tmpdir)
+            workflow_file = tmpdir_path / "workflow.yml"
+            workflow_file.write_text(dedent("""
+                name: Test
+                env:
+                  IGNORE_ME: ignored_value
+                  KEEP_ME: kept_value
+                  ALSO_IGNORE: another_ignored
+            """))
+            output_file = tmpdir_path / ".env.example"
+            modifier = WorkflowEnvToExample(
+                workflow_paths=(workflow_file,),
+                output_path=output_file,
+                ignored_names=("IGNORE_ME", "ALSO_IGNORE"),
+            )
+            result = modifier.modify([])
+            self.assertTrue(result)
+            content = output_file.read_text()
+            self.assertNotIn("IGNORE_ME", content)
+            self.assertNotIn("ALSO_IGNORE", content)
+            self.assertIn("KEEP_ME=kept_value", content)
