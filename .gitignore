@@ -6,3 +6,5 @@
 /.run/
 *__pycache__
 /docs/build/
+/any_hook/files_modifiers/tests/expected/
+/any_hook/files_modifiers/tests/inputs/

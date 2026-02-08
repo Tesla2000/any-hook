@@ -1,3 +1,4 @@
+from pathlib import Path
 from textwrap import dedent
 from unittest import TestCase
 
@@ -151,6 +152,16 @@ class TestObjectToAny(TestCase):
                 return [x]
         """).lstrip()
         self._assert_transformation(code, expected)
+
+    def test_custom_files(self):
+        for input_, expected in zip(
+            Path("any_hook/files_modifiers/tests/inputs").iterdir(),
+            Path("any_hook/files_modifiers/tests/expected").iterdir(),
+            strict=True,
+        ):
+            code = dedent(input_.read_text()).lstrip()
+            expected = dedent(expected.read_text()).lstrip()
+            self._assert_transformation(code, expected)
 
     def test_does_not_duplicate_any_import(self):
         code = dedent("""
