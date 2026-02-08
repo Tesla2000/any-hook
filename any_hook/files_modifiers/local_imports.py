@@ -9,7 +9,6 @@ from libcst import CSTVisitor
 from libcst import FunctionDef
 from libcst import Import
 from libcst import ImportFrom
-from libcst import ImportStar
 from libcst import Module
 from libcst import SimpleStatementLine
 
@@ -59,20 +58,15 @@ class _LocalImportVisitor(CSTVisitor):
 
     @staticmethod
     def _format_import(node: Import) -> str:
-        names = ", ".join(name.name.value for name in node.names)
-        return f"import {names}"
+        statement = SimpleStatementLine(body=[node])
+        temp_module = Module(body=[statement])
+        return temp_module.code.strip()
 
     @staticmethod
     def _format_import_from(node: ImportFrom) -> str:
-        module = ""
-        if node.module:
-            module = node.module.value
-        names = (
-            "*"
-            if isinstance(node.names, ImportStar)
-            else ", ".join(name.name.value for name in node.names)
-        )
-        return f"from {module} import {names}"
+        statement = SimpleStatementLine(body=[node])
+        temp_module = Module(body=[statement])
+        return temp_module.code.strip()
 
 
 class LocalImports(Modifier):

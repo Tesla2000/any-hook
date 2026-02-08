@@ -126,6 +126,15 @@ class TestLocalImports(TestCase):
         result = self._check_code(code)
         self.assertFalse(result)
 
+    def test_detects_nested_module_import(self):
+        code = dedent("""
+            def foo():
+                from urllib.parse import urlparse
+                return urlparse("http://example.com")
+        """).lstrip()
+        result = self._check_code(code)
+        self.assertTrue(result)
+
     def _check_code(self, code: str) -> bool:
         module = parse_module(code)
         file_data = FileData(path=Path("test.py"), content=code, module=module)
