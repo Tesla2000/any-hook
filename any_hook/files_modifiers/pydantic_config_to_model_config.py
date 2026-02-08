@@ -19,6 +19,7 @@ from libcst import Name
 from libcst import SimpleStatementLine
 from libcst import SimpleWhitespace
 from pydantic import ConfigDict
+from pydantic import Field
 
 
 class _PydanticConfigToModelConfigTransformer(CSTTransformer):
@@ -187,10 +188,39 @@ class _PydanticConfigToModelConfigTransformer(CSTTransformer):
 class PydanticConfigToModelConfig(
     SeparateModifier[_PydanticConfigToModelConfigTransformer]
 ):
+    """Migrates Pydantic v1 Config class to v2 model_config.
+
+    Converts nested Config classes to model_config assignments using ConfigDict.
+    This is part of the Pydantic v1 to v2 migration path. Automatically adds
+    ConfigDict import if not already present.
+
+    Examples:
+        Before:
+            >>> from pydantic import BaseModel
+            >>> class User(BaseModel):
+            ...     name: str
+            ...     class Config:
+            ...         frozen = True
+            ...         extra = "forbid"
+
+        After:
+            >>> from pydantic import BaseModel, ConfigDict
+            >>> class User(BaseModel):
+            ...     name: str
+            ...     model_config = ConfigDict(frozen=True, extra="forbid")
+
+    Note:
+        If a class already has model_config defined, the Config class is
+        left unchanged to avoid conflicts.
+    """
+
     type: Literal["pydantic-config-to-model-config"] = (
         "pydantic-config-to-model-config"
     )
-    config_class_name: str = "Config"
+    config_class_name: str = Field(
+        default="Config",
+        description="Name of the nested configuration class to convert. Defaults to 'Config'.",
+    )
 
     def _create_transformer(self) -> _PydanticConfigToModelConfigTransformer:
         return _PydanticConfigToModelConfigTransformer(self.config_class_name)

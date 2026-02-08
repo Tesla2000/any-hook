@@ -6,6 +6,20 @@ A collection of customizable pre-commit hooks for Python code quality and transf
 
 `any-hook` is a flexible pre-commit hook framework that provides various code modifiers and validators for Python projects. It uses libcst for AST-based transformations and Pydantic for configuration management.
 
+## Documentation
+
+For comprehensive documentation including detailed API reference and configuration options for all modifiers, see the [full documentation](https://github.com/Tesla2000/any-hook/tree/main/docs).
+
+To build the documentation locally:
+
+```bash
+pip install -e ".[docs]"
+cd docs
+make html
+```
+
+Then open `docs/_build/html/index.html` in your browser.
+
 ## Installation
 
 ```bash

@@ -11,6 +11,7 @@ from libcst import Import
 from libcst import ImportFrom
 from libcst import Module
 from libcst import SimpleStatementLine
+from pydantic import Field
 
 
 class _LocalImportVisitor(CSTVisitor):
@@ -70,8 +71,39 @@ class _LocalImportVisitor(CSTVisitor):
 
 
 class LocalImports(Modifier):
+    """Detects import statements inside functions or classes.
+
+    Reports any import or from-import statements that appear inside function
+    or class definitions rather than at module level. Local imports can hide
+    dependencies and make code harder to maintain.
+
+    Examples:
+        Violation detected:
+            >>> def process_data():
+            ...     import pandas as pd  # Local import detected
+            ...     return pd.DataFrame()
+
+        Violation detected:
+            >>> class DataProcessor:
+            ...     def run(self):
+            ...         from typing import Dict  # Local import detected
+            ...         return Dict[str, int]
+
+        Allowed (with ignore comment):
+            >>> def dynamic_import():
+            ...     import importlib  # ignore
+            ...     return importlib.import_module("foo")
+
+    Note:
+        Use the ignore_pattern to suppress warnings for specific imports
+        using inline comments.
+    """
+
     type: Literal["local-imports"] = "local-imports"
-    ignore_pattern: str = r"#\s*ignore"
+    ignore_pattern: str = Field(
+        default=r"#\s*ignore",
+        description="Regex pattern to match ignore comments that suppress local import warnings.",
+    )
 
     def modify(self, data: Iterable[FileData]) -> bool:
         return any(self._check_file(file_data) for file_data in data)

@@ -21,6 +21,31 @@ class _EnvFileState(BaseModel):
 
 
 class WorkflowEnvToExample(Modifier):
+    """Extracts environment variables from workflow files to .env.example.
+
+    Scans GitHub Actions workflow files (or similar YAML configs) for environment
+    variable declarations and maintains a .env.example file with all discovered
+    variables. Preserves existing variables and organizes new ones by source file.
+
+    Examples:
+        Given a workflow file .github/workflows/test.yml:
+            >>> jobs:
+            ...   test:
+            ...     env:
+            ...       DATABASE_URL: postgres://localhost
+            ...       API_KEY: ""
+
+        Generates .env.example:
+            >>> # From: .github/workflows/test.yml
+            >>> DATABASE_URL=postgres://localhost
+            >>> API_KEY=
+
+    Note:
+        Variables with template syntax like ${{ secrets.FOO }} are ignored.
+        Existing variables in .env.example are never modified, only new ones
+        are added under their source file section.
+    """
+
     type: Literal["workflow-env-to-example"] = "workflow-env-to-example"
     workflow_paths: tuple[Path, ...] = Field(
         description="Paths to workflow files to extract env variables from"

@@ -91,6 +91,29 @@ class _PydanticV1ToV2Transformer(CSTTransformer):
 
 
 class PydanticV1ToV2(SeparateModifier[_PydanticV1ToV2Transformer]):
+    """Migrates pydantic.v1 imports to pydantic v2.
+
+    Removes the .v1 compatibility layer by converting all pydantic.v1 imports
+    to direct pydantic imports. This handles both from-imports and regular
+    imports, as well as attribute access like pydantic.v1.BaseModel.
+
+    Examples:
+        Before:
+            >>> from pydantic.v1 import BaseModel
+            >>> import pydantic.v1
+            >>> model = pydantic.v1.BaseModel
+
+        After:
+            >>> from pydantic import BaseModel
+            >>> import pydantic
+            >>> model = pydantic.BaseModel
+
+    Note:
+        This modifier only changes import statements. You may need to use
+        other modifiers like PydanticConfigToModelConfig to complete the
+        migration from Pydantic v1 to v2.
+    """
+
     type: Literal["pydantic-v1-to-v2"] = "pydantic-v1-to-v2"
 
     def _create_transformer(self) -> _PydanticV1ToV2Transformer:

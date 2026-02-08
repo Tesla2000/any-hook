@@ -10,6 +10,7 @@ from libcst import Expr
 from libcst import Module
 from libcst import Name
 from libcst import SimpleStatementLine
+from pydantic import Field
 
 
 class _ForbiddenFunctionsVisitor(CSTVisitor):
@@ -54,9 +55,39 @@ class _ForbiddenFunctionsVisitor(CSTVisitor):
 
 
 class ForbiddenFunctions(Modifier):
+    """Detects calls to forbidden function names.
+
+    Reports any direct function calls matching the specified forbidden names.
+    Useful for enforcing code standards, preventing deprecated API usage, or
+    blocking unsafe operations.
+
+    Examples:
+        Configuration:
+            >>> modifier = ForbiddenFunctions(
+            ...     forbidden_functions=("print", "eval", "exec")
+            ... )
+
+        Violation detected:
+            >>> print("debug info")  # print usage detected
+            >>> result = eval(user_input)  # eval usage detected
+
+        Allowed (with ignore comment):
+            >>> print("temporary debug")  # ignore
+
+    Note:
+        Only detects simple function calls like `func()`. Method calls like
+        `obj.method()` or imported names like `module.func()` are not detected.
+        Use ignore_pattern to suppress specific violations.
+    """
+
     type: Literal["forbidden-functions"] = "forbidden-functions"
-    ignore_pattern: str = r"#\s*ignore"
-    forbidden_functions: tuple[str, ...]
+    ignore_pattern: str = Field(
+        default=r"#\s*ignore",
+        description="Regex pattern to match ignore comments that suppress forbidden function warnings.",
+    )
+    forbidden_functions: tuple[str, ...] = Field(
+        description="Tuple of function names that should not be called in the codebase.",
+    )
 
     def modify(self, data: Iterable[FileData]) -> bool:
         return any(self._check_file(file_data) for file_data in data)

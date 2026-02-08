@@ -108,6 +108,27 @@ class _ObjectToAnyTransformer(CSTTransformer):
 
 
 class ObjectToAny(SeparateModifier[_ObjectToAnyTransformer]):
+    """Transforms object type hints to Any.
+
+    Converts all uses of `object` in type annotations to `Any` for better
+    type checking compatibility. Automatically adds `from typing import Any`
+    if not already present.
+
+    Examples:
+        Before:
+            >>> def foo(x: object) -> list[object]:
+            ...     return [x]
+
+        After:
+            >>> from typing import Any
+            >>> def foo(x: Any) -> list[Any]:
+            ...     return [x]
+
+    Note:
+        Only type annotations are modified. Uses of `object` as a base class,
+        in isinstance() calls, or as constructors remain unchanged.
+    """
+
     type: Literal["object-to-any"] = "object-to-any"
 
     def _create_transformer(self) -> _ObjectToAnyTransformer:

@@ -19,6 +19,7 @@ from libcst import Name
 from libcst import SimpleStatementLine
 from libcst import SimpleString
 from libcst.helpers import get_absolute_module_for_import
+from pydantic import Field
 
 
 class _StrEnumInheritanceTransformer(CSTTransformer):
@@ -217,9 +218,45 @@ class _StrEnumInheritanceTransformer(CSTTransformer):
 
 
 class StrEnumInheritance(SeparateModifier[_StrEnumInheritanceTransformer]):
+    """Modernizes string enum definitions to use StrEnum.
+
+    Converts classes that inherit from both str and Enum to use the more
+    modern StrEnum base class (Python 3.11+). Optionally converts string
+    values to auto() when they match the member name in lowercase.
+
+    Examples:
+        Before:
+            >>> from enum import Enum
+            >>> class Status(str, Enum):
+            ...     ACTIVE = "active"
+            ...     INACTIVE = "inactive"
+
+        After (with convert_to_auto=True):
+            >>> from enum import StrEnum, auto
+            >>> class Status(StrEnum):
+            ...     ACTIVE = auto()
+            ...     INACTIVE = auto()
+
+        After (with convert_to_auto=False):
+            >>> from enum import StrEnum
+            >>> class Status(StrEnum):
+            ...     ACTIVE = "active"
+            ...     INACTIVE = "inactive"
+
+    Note:
+        The auto() conversion only applies when the string value matches
+        the member name in lowercase (e.g., ACTIVE="active").
+    """
+
     type: Literal["str-enum-inheritance"] = "str-enum-inheritance"
-    convert_to_auto: bool = True
-    convert_existing_str_enum: bool = True
+    convert_to_auto: bool = Field(
+        default=True,
+        description="Convert string enum values to auto() when the value matches the member name in lowercase.",
+    )
+    convert_existing_str_enum: bool = Field(
+        default=True,
+        description="Also process classes already using StrEnum (for auto() conversion).",
+    )
 
     def _create_transformer(self) -> _StrEnumInheritanceTransformer:
         return _StrEnumInheritanceTransformer(
