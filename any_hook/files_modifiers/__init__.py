@@ -1,12 +1,31 @@
 from typing import Annotated
 from typing import Union
 
+from any_hook.files_modifiers.local_imports import LocalImports
 from any_hook.files_modifiers.object_to_any import ObjectToAny
+from any_hook.files_modifiers.pydantic_config_to_model_config import (
+    PydanticConfigToModelConfig,
+)
+from any_hook.files_modifiers.pydantic_v1_to_v2 import PydanticV1ToV2
+from any_hook.files_modifiers.str_enum_inheritance import StrEnumInheritance
 from pydantic import Field
 
-AnyModifier = Annotated[Union[ObjectToAny], Field(discriminator="type")]
+AnyModifier = Annotated[
+    Union[
+        ObjectToAny,
+        PydanticConfigToModelConfig,
+        PydanticV1ToV2,
+        StrEnumInheritance,
+        LocalImports,
+    ],
+    Field(discriminator="type"),
+]
 __all__ = [
     "ObjectToAny",
+    "PydanticConfigToModelConfig",
+    "PydanticV1ToV2",
+    "StrEnumInheritance",
+    "LocalImports",
     "AnyModifier",
 ]
 try:

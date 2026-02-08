@@ -56,7 +56,7 @@ repos:
             ".venv,venv,tests/base.py",
             "--ignore-attributes-for-classes=.*",
             "--ignore-decorators=@app.*,@pytest.fixture,@property,@model_validator,@field_serializer,@field_validator",
-            "--ignore-names=Meta,__dict__,cli_cmd,model_post_init,visit_Annotation,leave_Annotation,visit_Subscript,leave_Subscript,leave_Name,visit_ImportFrom,leave_Module",
+            "--ignore-names=Meta,__dict__,cli_cmd,model_post_init,visit_Annotation,leave_Annotation,visit_Subscript,leave_Subscript,leave_Name,visit_ImportFrom,leave_Module,leave_AnnAssign,leave_Assign,leave_ClassDef,visit_ClassDef,leave_Attribute,leave_Import,leave_ImportFrom,visit_Import,leave_FunctionDef,visit_FunctionDef",
           ]
         stages: [ pre-commit ]
 
