@@ -1,3 +1,4 @@
+import typing
 from collections.abc import Sequence
 from typing import Any
 from typing import Literal
@@ -26,12 +27,12 @@ class _ObjectToAnyTransformer(CSTTransformer):
 
     def visit_ImportFrom(self, node: ImportFrom) -> bool:
         module = get_absolute_module_for_import(None, node)
-        if module == "typing":
+        if module == typing.__name__:
             if isinstance(node.names, ImportStar):
                 self._has_any_import = True
             else:
                 self._has_any_import = any(
-                    alias.name.value == "Any" for alias in node.names
+                    alias.name.value == Any.__name__ for alias in node.names
                 )
         return False
 
@@ -76,13 +77,15 @@ class _ObjectToAnyTransformer(CSTTransformer):
             ):
                 import_node = statement.body[0]
                 module = get_absolute_module_for_import(None, import_node)
-                if module == "typing" and not isinstance(
-                    import_node.names, ImportStar
+                if (
+                    module == typing.__name__
+                    and not isinstance(import_node.names, ImportStar)
+                    and not typing_import_found
                 ):
                     typing_import_found = True
                     new_names: Sequence[ImportAlias] = [
                         *import_node.names,
-                        ImportAlias(name=Name("Any")),
+                        ImportAlias(name=Name(Any.__name__)),
                     ]
                     new_import = import_node.with_changes(names=new_names)
                     new_statement = statement.with_changes(body=[new_import])
@@ -93,8 +96,8 @@ class _ObjectToAnyTransformer(CSTTransformer):
             new_import = SimpleStatementLine(
                 body=[
                     ImportFrom(
-                        module=Name("typing"),
-                        names=[ImportAlias(name=Name("Any"))],
+                        module=Name(typing.__name__),
+                        names=[ImportAlias(name=Name(Any.__name__))],
                     )
                 ],
                 trailing_whitespace=EmptyLine(),

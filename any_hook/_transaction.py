@@ -12,7 +12,8 @@ def transaction(
     paths: Iterable[Path],
 ) -> Generator[tuple[Iterable[Path], Iterable[str]], None, None]:
     paths1, paths2, paths3 = tee(
-        filter(lambda path_: path_.suffix == ".py", paths)
+        filter(lambda path_: path_.suffix == ".py", paths),
+        3,
     )
     contents = map(Path.read_text, paths1)
     try:

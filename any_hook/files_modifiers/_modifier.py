@@ -11,7 +11,7 @@ from pydantic import BaseModel
 
 
 class Modifier(BaseModel, ABC):
-    outputs: tuple[AnyOutput, ...] = StandardOutput()
+    outputs: tuple[AnyOutput, ...] = (StandardOutput(),)
 
     @abstractmethod
     def modify(self, data: Iterable[FileData]) -> Literal[0, 1]:
