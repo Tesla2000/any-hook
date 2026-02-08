@@ -15,7 +15,7 @@ dependencies = [
 ]
 
 [project.scripts]
-any-hook = "any-hook:main"
+any-hook = "any_hook:main"
 
 [build-system]
 requires = ["hatchling"]
