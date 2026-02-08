@@ -18,7 +18,7 @@ wheels = [
 
 [[package]]
 name = "any-hook"
-version = "0.1.7"
+version = "0.1.8"
 source = { editable = "." }
 dependencies = [
     { name = "libcst" },
@@ -29,6 +29,11 @@ dependencies = [
     { name = "transaction" },
 ]
 
+[package.optional-dependencies]
+workflow-env-to-example = [
+    { name = "pyyaml" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "libcst", specifier = ">=1.4.0" },
@@ -36,8 +41,10 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.8.2" },
     { name = "pydantic-settings", specifier = ">=2.10.1" },
     { name = "python-dotenv", specifier = ">=1.0.1" },
+    { name = "pyyaml", marker = "extra == 'workflow-env-to-example'", specifier = ">=6.0.0" },
     { name = "transaction", specifier = ">=5.0" },
 ]
+provides-extras = ["workflow-env-to-example"]
 
 [[package]]
 name = "libcst"
