@@ -1,8 +1,6 @@
-import operator
 from abc import ABC
 from abc import abstractmethod
 from collections.abc import Iterable
-from functools import reduce
 from typing import Generic
 from typing import TypeVar
 
@@ -18,7 +16,7 @@ class SeparateModifier(Modifier, ABC, Generic[TransformerType]):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     def modify(self, data: Iterable[FileData]) -> bool:
-        return reduce(operator.or_, map(self._modify_file, data), False)
+        return any(map(self._modify_file, data))
 
     def _modify_file(self, file_data: FileData) -> bool:
         new_code = file_data.module.visit(self._create_transformer()).code

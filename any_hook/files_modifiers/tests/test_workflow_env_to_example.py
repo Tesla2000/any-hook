@@ -191,3 +191,27 @@ class TestWorkflowEnvToExample(TestCase):
             content = output_file.read_text()
             self.assertIn("EMPTY_VAR=", content)
             self.assertIn("VAR_WITH_VALUE=some_value", content)
+
+    def test_handles_github_secrets(self):
+        with TemporaryDirectory() as tmpdir:
+            tmpdir_path = Path(tmpdir)
+            workflow_file = tmpdir_path / "workflow.yml"
+            workflow_file.write_text(dedent("""
+                name: Test
+                env:
+                  GH_TOKEN: ${{ secrets.GH_TOKEN }}
+                  API_KEY: ${{ secrets.API_KEY }}
+                  REGULAR_VAR: regular_value
+            """))
+            output_file = tmpdir_path / ".env.example"
+            modifier = WorkflowEnvToExample(
+                workflow_paths=(workflow_file,), output_path=output_file
+            )
+            result = modifier.modify([])
+            self.assertTrue(result)
+            content = output_file.read_text()
+            self.assertIn("GH_TOKEN=\n", content)
+            self.assertIn("API_KEY=\n", content)
+            self.assertNotIn("${{", content)
+            self.assertNotIn("secrets", content)
+            self.assertIn("REGULAR_VAR=regular_value", content)

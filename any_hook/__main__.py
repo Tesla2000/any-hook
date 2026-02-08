@@ -30,7 +30,6 @@ class Main(BaseSettings):
                     contents,
                 )
             )
-            fail = 0
-            for modifier in self.modifiers:
-                fail |= modifier.modify(files_data)
-            return fail
+            return any(
+                modifier.modify(files_data) for modifier in self.modifiers
+            )

@@ -19,19 +19,15 @@ class WorkflowEnvToExample(Modifier):
         description="Path to the .env.example file to write to",
     )
 
-    def modify(self, data: Iterable[FileData]) -> bool:
+    def modify(self, _: Iterable[FileData]) -> bool:
         env_vars = self._collect_env_vars_from_workflows()
         if not env_vars:
-            self._output("No environment variables found in workflow files")
             return False
         existing_content, existing_vars = self._read_existing_env_file()
         new_sections, added_vars = self._build_new_sections(
             env_vars, existing_vars
         )
         if not new_sections:
-            self._output(
-                "All environment variables already present in .env.example"
-            )
             return False
         self._write_updated_env_file(existing_content, new_sections)
         self._output(
@@ -103,7 +99,13 @@ class WorkflowEnvToExample(Modifier):
                 env_section = data["env"]
                 if isinstance(env_section, dict):
                     for key, value in env_section.items():
-                        env_vars[key] = str(value) if value is not None else ""
+                        if value is None:
+                            env_vars[key] = ""
+                        else:
+                            str_value = str(value)
+                            env_vars[key] = (
+                                "" if "${{" in str_value else str_value
+                            )
             for value in data.values():
                 env_vars.update(self._extract_env_vars(value))
         elif isinstance(data, list):
