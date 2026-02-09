@@ -138,6 +138,15 @@ class TestObjectToAny(TestCase):
         """).lstrip()
         self._assert_transformation(code, expected)
 
+    def test_attribute_kept(self):
+        code = dedent("""
+            graph_data: list[_Node] = entry.object["graph"]
+        """).lstrip()
+        expected = dedent("""
+            graph_data: list[_Node] = entry.object["graph"]
+        """).lstrip()
+        self._assert_transformation(code, expected)
+
     def test_adds_any_to_one_existing_typing_import(self):
         code = dedent("""
             from typing import List

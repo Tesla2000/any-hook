@@ -6,6 +6,7 @@ from typing import Literal
 from any_hook._file_data import FileData
 from any_hook.files_modifiers.separate_modifier import SeparateModifier
 from libcst import Annotation
+from libcst import Attribute
 from libcst import CSTTransformer
 from libcst import EmptyLine
 from libcst import ImportAlias
@@ -23,6 +24,7 @@ class _ObjectToAnyTransformer(CSTTransformer):
         super().__init__()
         self._in_annotation = False
         self._in_subscript = 0
+        self._in_attribute = False
         self._made_changes = False
         self._has_any_import = False
 
@@ -57,10 +59,22 @@ class _ObjectToAnyTransformer(CSTTransformer):
         self._in_subscript -= 1
         return updated_node
 
+    def visit_Attribute(self, _: Attribute) -> bool:
+        self._in_attribute = True
+        return True
+
+    def leave_Attribute(
+        self, _: Attribute, updated_node: Attribute
+    ) -> Attribute:
+        self._in_attribute = False
+        return updated_node
+
     def leave_Name(self, _: Name, updated_node: Name) -> Name:
         if (
-            self._in_annotation or self._in_subscript > 0
-        ) and updated_node.value == object.__name__:
+            (self._in_annotation or self._in_subscript > 0)
+            and updated_node.value == object.__name__
+            and not self._in_attribute
+        ):
             self._made_changes = True
             return Name(Any.__name__)
         return updated_node
