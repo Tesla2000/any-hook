@@ -7,5 +7,3 @@
 *__pycache__
 /docs/build/
 /docs/_build/
-/any_hook/files_modifiers/tests/expected/
-/any_hook/files_modifiers/tests/inputs/

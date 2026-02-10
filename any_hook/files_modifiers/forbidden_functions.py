@@ -64,7 +64,12 @@ class ForbiddenFunctions(Modifier):
     Examples:
         Configuration:
             >>> modifier = ForbiddenFunctions(
-            ...     forbidden_functions=("print", "eval", "exec")
+            ...     forbidden_functions=("print", "eval", "exec"),
+            ...     excluded_paths=("tests/*", "scripts/*")
+            ... )
+            >>> modifier = ForbiddenFunctions(
+            ...     forbidden_functions=("print",),
+            ...     included_paths=("src/*",)
             ... )
 
         Violation detected:
@@ -74,10 +79,15 @@ class ForbiddenFunctions(Modifier):
         Allowed (with ignore comment):
             >>> print("temporary debug")  # ignore
 
+        Allowed (in excluded path):
+            >>> # File: tests/test_foo.py
+            >>> print("test output")  # allowed in tests
+
     Note:
         Only detects simple function calls like `func()`. Method calls like
         `obj.method()` or imported names like `module.func()` are not detected.
         Use ignore_pattern to suppress specific violations.
+        Use excluded_paths or included_paths (inherited from Modifier) to filter files.
     """
 
     type: Literal["forbidden-functions"] = "forbidden-functions"
@@ -94,6 +104,8 @@ class ForbiddenFunctions(Modifier):
 
     def _check_file(self, file_data: FileData) -> bool:
         if not self.forbidden_functions:
+            return False
+        if not self._should_process_file(file_data.path):
             return False
         compiled_pattern = re.compile(self.ignore_pattern, re.IGNORECASE)
         visitor = _ForbiddenFunctionsVisitor(
