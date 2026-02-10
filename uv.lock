@@ -28,7 +28,7 @@ wheels = [
 
 [[package]]
 name = "any-hook"
-version = "0.1.17"
+version = "1.0.1"
 source = { editable = "." }
 dependencies = [
     { name = "libcst" },
