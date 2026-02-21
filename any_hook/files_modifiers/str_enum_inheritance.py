@@ -2,6 +2,7 @@ import enum
 from typing import Literal
 
 from any_hook._file_data import FileData
+from any_hook.files_modifiers._import_adder import ModuleImportAdder
 from any_hook.files_modifiers.separate_modifier import SeparateModifier
 from libcst import AnnAssign
 from libcst import Arg
@@ -10,8 +11,6 @@ from libcst import AssignTarget
 from libcst import Call
 from libcst import ClassDef
 from libcst import CSTTransformer
-from libcst import EmptyLine
-from libcst import ImportAlias
 from libcst import ImportFrom
 from libcst import ImportStar
 from libcst import Module
@@ -27,8 +26,10 @@ class _StrEnumInheritanceTransformer(CSTTransformer):
         self,
         convert_to_auto: bool = False,
         convert_existing_str_enum: bool = False,
+        import_adder: ModuleImportAdder = ModuleImportAdder(),
     ) -> None:
         super().__init__()
+        self._import_adder = import_adder
         self._convert_to_auto = convert_to_auto
         self._convert_existing_str_enum = convert_existing_str_enum
         self._made_changes = False
@@ -146,75 +147,17 @@ class _StrEnumInheritanceTransformer(CSTTransformer):
             if isinstance(statement, SimpleStatementLine):
                 continue
             statement.visit(self)
-        new_body = []
-        enum_import_found = False
-        for statement in updated_node.body:
-            if (
-                isinstance(statement, SimpleStatementLine)
-                and len(statement.body) == 1
-                and isinstance(statement.body[0], ImportFrom)
-            ):
-                import_node = statement.body[0]
-                module = get_absolute_module_for_import(None, import_node)
-                if (
-                    module == enum.__name__
-                    and not isinstance(import_node.names, ImportStar)
-                    and not enum_import_found
-                ):
-                    enum_import_found = True
-                    new_names = []
-                    has_str_enum_in_import = False
-                    has_auto_in_import = False
-                    for alias in import_node.names:
-                        if (
-                            alias.name.value == enum.Enum.__name__
-                            and not self._enum_still_used
-                        ):
-                            continue
-                        if alias.name.value == enum.StrEnum.__name__:
-                            has_str_enum_in_import = True
-                            new_names.append(alias)
-                            continue
-                        if alias.name.value == enum.auto.__name__:
-                            has_auto_in_import = True
-                            new_names.append(alias)
-                            continue
-                        new_names.append(alias)
-                    if not has_str_enum_in_import:
-                        new_names.append(
-                            ImportAlias(name=Name(enum.StrEnum.__name__))
-                        )
-                    if (
-                        self._needs_auto_import
-                        and not has_auto_in_import
-                        and not self._has_auto_import
-                    ):
-                        new_names.append(
-                            ImportAlias(name=Name(enum.auto.__name__))
-                        )
-                    if new_names:
-                        new_import = import_node.with_changes(names=new_names)
-                        new_statement = statement.with_changes(
-                            body=[new_import]
-                        )
-                        new_body.append(new_statement)
-                    continue
-            new_body.append(statement)
-        if not enum_import_found and not self._has_str_enum_import:
-            import_names = [ImportAlias(name=Name(enum.StrEnum.__name__))]
-            if self._needs_auto_import and not self._has_auto_import:
-                import_names.append(ImportAlias(name=Name(enum.auto.__name__)))
-            new_import = SimpleStatementLine(
-                body=[
-                    ImportFrom(
-                        module=Name(enum.__name__),
-                        names=import_names,
-                    )
-                ],
-                trailing_whitespace=EmptyLine(),
-            )
-            new_body.insert(0, new_import)
-        return updated_node.with_changes(body=new_body)
+        remove_names = (
+            [enum.Enum.__name__] if not self._enum_still_used else []
+        )
+        add_names = []
+        if not self._has_str_enum_import:
+            add_names.append(enum.StrEnum.__name__)
+        if self._needs_auto_import and not self._has_auto_import:
+            add_names.append(enum.auto.__name__)
+        return self._import_adder.add(
+            updated_node, enum.__name__, add_names, remove_names
+        )
 
 
 class StrEnumInheritance(SeparateModifier[_StrEnumInheritanceTransformer]):
@@ -257,11 +200,13 @@ class StrEnumInheritance(SeparateModifier[_StrEnumInheritanceTransformer]):
         default=True,
         description="Also process classes already using StrEnum (for auto() conversion).",
     )
+    import_adder: ModuleImportAdder = Field(default_factory=ModuleImportAdder)
 
     def _create_transformer(self) -> _StrEnumInheritanceTransformer:
         return _StrEnumInheritanceTransformer(
             convert_to_auto=self.convert_to_auto,
             convert_existing_str_enum=self.convert_existing_str_enum,
+            import_adder=self.import_adder,
         )
 
     def _modify_file(self, file_data: FileData) -> bool:

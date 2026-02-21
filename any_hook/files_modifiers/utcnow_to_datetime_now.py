@@ -1,29 +1,28 @@
 import datetime
-from collections.abc import Sequence
 from typing import Literal
 
 from any_hook._file_data import FileData
+from any_hook.files_modifiers._import_adder import ModuleImportAdder
 from any_hook.files_modifiers.separate_modifier import SeparateModifier
 from libcst import Arg
 from libcst import Attribute
 from libcst import BaseExpression
 from libcst import Call
 from libcst import CSTTransformer
-from libcst import EmptyLine
-from libcst import ImportAlias
 from libcst import ImportFrom
 from libcst import ImportStar
 from libcst import Lambda
 from libcst import Module
 from libcst import Name
 from libcst import Parameters
-from libcst import SimpleStatementLine
 from libcst.helpers import get_absolute_module_for_import
+from pydantic import Field
 
 
 class _UtcNowTransformer(CSTTransformer):
-    def __init__(self) -> None:
+    def __init__(self, import_adder: ModuleImportAdder) -> None:
         super().__init__()
+        self._import_adder = import_adder
         self._in_utcnow_call = False
         self._needs_utc_import = False
         self._has_utc_import = False
@@ -107,42 +106,7 @@ class _UtcNowTransformer(CSTTransformer):
     def leave_Module(self, _: Module, updated_node: Module) -> Module:
         if not self._needs_utc_import or self._has_utc_import:
             return updated_node
-        new_body = []
-        datetime_import_found = False
-        for statement in updated_node.body:
-            if (
-                isinstance(statement, SimpleStatementLine)
-                and len(statement.body) == 1
-                and isinstance(statement.body[0], ImportFrom)
-            ):
-                import_node = statement.body[0]
-                if (
-                    get_absolute_module_for_import(None, import_node)
-                    == datetime.__name__
-                    and not isinstance(import_node.names, ImportStar)
-                    and not datetime_import_found
-                ):
-                    datetime_import_found = True
-                    new_names: Sequence[ImportAlias] = [
-                        *import_node.names,
-                        ImportAlias(name=Name("UTC")),
-                    ]
-                    new_import = import_node.with_changes(names=new_names)
-                    new_body.append(statement.with_changes(body=[new_import]))
-                    continue
-            new_body.append(statement)
-        if not datetime_import_found:
-            new_import = SimpleStatementLine(
-                body=[
-                    ImportFrom(
-                        module=Name(datetime.__name__),
-                        names=[ImportAlias(name=Name("UTC"))],
-                    )
-                ],
-                trailing_whitespace=EmptyLine(),
-            )
-            new_body.insert(0, new_import)
-        return updated_node.with_changes(body=new_body)
+        return self._import_adder.add(updated_node, datetime.__name__, ["UTC"])
 
     @staticmethod
     def _is_class_utcnow(node: object) -> bool:
@@ -197,9 +161,10 @@ class UtcNowToDatetimeNow(SeparateModifier[_UtcNowTransformer]):
     """
 
     type: Literal["utcnow-to-datetime-now"] = "utcnow-to-datetime-now"
+    import_adder: ModuleImportAdder = Field(default_factory=ModuleImportAdder)
 
     def _create_transformer(self) -> _UtcNowTransformer:
-        return _UtcNowTransformer()
+        return _UtcNowTransformer(self.import_adder)
 
     def _modify_file(self, file_data: FileData) -> bool:
         if "utcnow" not in file_data.content:

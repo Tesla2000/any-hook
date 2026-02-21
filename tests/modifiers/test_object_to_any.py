@@ -1,6 +1,7 @@
 from textwrap import dedent
 from unittest import TestCase
 
+from any_hook.files_modifiers._import_adder import ModuleImportAdder
 from any_hook.files_modifiers.object_to_any import _ObjectToAnyTransformer
 from libcst import parse_module
 
@@ -204,7 +205,7 @@ class TestObjectToAny(TestCase):
 
     def _assert_transformation(self, original: str, expected: str) -> None:
         module = parse_module(original)
-        transformer = _ObjectToAnyTransformer()
+        transformer = _ObjectToAnyTransformer(ModuleImportAdder())
         transformed = module.visit(transformer)
         result = transformed.code
         self.assertEqual(result, expected)

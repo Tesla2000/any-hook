@@ -1,6 +1,7 @@
 from textwrap import dedent
 from unittest import TestCase
 
+from any_hook.files_modifiers._import_adder import ModuleImportAdder
 from any_hook.files_modifiers.utcnow_to_datetime_now import _UtcNowTransformer
 from libcst import parse_module
 
@@ -193,7 +194,7 @@ class TestUtcNowToDatetimeNow(TestCase):
         """).lstrip()
         self._assert_transformation(code, expected)
         module = parse_module(code)
-        result = module.visit(_UtcNowTransformer())
+        result = module.visit(_UtcNowTransformer(ModuleImportAdder()))
         self.assertNotIn("from datetime import", result.code)
 
     def test_module_style_multiple_occurrences(self):
@@ -222,7 +223,7 @@ class TestUtcNowToDatetimeNow(TestCase):
 
     def _assert_transformation(self, original: str, expected: str) -> None:
         module = parse_module(original)
-        transformer = _UtcNowTransformer()
+        transformer = _UtcNowTransformer(ModuleImportAdder())
         transformed = module.visit(transformer)
         self.assertEqual(transformed.code, expected)
 

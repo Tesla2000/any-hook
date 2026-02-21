@@ -1,6 +1,7 @@
 from textwrap import dedent
 from unittest import TestCase
 
+from any_hook.files_modifiers._import_adder import ModuleImportAdder
 from any_hook.files_modifiers.pydantic_config_to_model_config import (
     _PydanticConfigToModelConfigTransformer,
 )
@@ -220,7 +221,9 @@ class TestPydanticConfigToModelConfig(TestCase):
 
     def _assert_transformation(self, original: str, expected: str) -> None:
         module = parse_module(original)
-        transformer = _PydanticConfigToModelConfigTransformer("Config")
+        transformer = _PydanticConfigToModelConfigTransformer(
+            "Config", ModuleImportAdder()
+        )
         transformed = module.visit(transformer)
         result = transformed.code
         self.assertEqual(result, expected)

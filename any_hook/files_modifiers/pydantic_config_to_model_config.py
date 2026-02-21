@@ -2,6 +2,7 @@ from typing import Literal
 
 import pydantic
 from any_hook._file_data import FileData
+from any_hook.files_modifiers._import_adder import ModuleImportAdder
 from any_hook.files_modifiers.separate_modifier import SeparateModifier
 from libcst import Arg
 from libcst import Assign
@@ -10,8 +11,6 @@ from libcst import AssignTarget
 from libcst import Call
 from libcst import ClassDef
 from libcst import CSTTransformer
-from libcst import EmptyLine
-from libcst import ImportAlias
 from libcst import ImportFrom
 from libcst import IndentedBlock
 from libcst import Module
@@ -23,8 +22,11 @@ from pydantic import Field
 
 
 class _PydanticConfigToModelConfigTransformer(CSTTransformer):
-    def __init__(self, config_class_name: str) -> None:
+    def __init__(
+        self, config_class_name: str, import_adder: ModuleImportAdder
+    ) -> None:
         super().__init__()
+        self._import_adder = import_adder
         self._made_changes = False
         self._has_config_dict_import = False
         self._current_class_depth = 0
@@ -129,60 +131,11 @@ class _PydanticConfigToModelConfigTransformer(CSTTransformer):
         return False
 
     def leave_Module(self, _: Module, updated_node: Module) -> Module:
-        if not self._made_changes:
+        if not self._made_changes or self._has_config_dict_import:
             return updated_node
-        if self._has_config_dict_import:
-            return updated_node
-        new_body = []
-        import_added = False
-        for statement in updated_node.body:
-            statement_was_modified = False
-            if not import_added and isinstance(statement, SimpleStatementLine):
-                for body_item in statement.body:
-                    if isinstance(body_item, ImportFrom):
-                        if (
-                            body_item.module
-                            and isinstance(body_item.module, Name)
-                            and body_item.module.value == pydantic.__name__
-                        ):
-                            if not isinstance(body_item.names, str):
-                                new_names = list(body_item.names) + [
-                                    ImportAlias(name=Name(ConfigDict.__name__))
-                                ]
-                                new_import = body_item.with_changes(
-                                    names=new_names
-                                )
-                                new_statement = statement.with_changes(
-                                    body=[new_import]
-                                )
-                                new_body.append(new_statement)
-                                import_added = True
-                                statement_was_modified = True
-                                break
-            if not statement_was_modified:
-                new_body.append(statement)
-        if not import_added:
-            new_import = SimpleStatementLine(
-                body=[
-                    ImportFrom(
-                        module=Name(pydantic.__name__),
-                        names=[ImportAlias(name=Name(ConfigDict.__name__))],
-                    )
-                ],
-                trailing_whitespace=EmptyLine(),
-            )
-            for i, statement in enumerate(new_body):
-                if isinstance(statement, SimpleStatementLine):
-                    for body_item in statement.body:
-                        if isinstance(body_item, ImportFrom):
-                            new_body.insert(i + 1, new_import)
-                            import_added = True
-                            break
-                if import_added:
-                    break
-            if not import_added:
-                new_body.insert(0, new_import)
-        return updated_node.with_changes(body=new_body)
+        return self._import_adder.add(
+            updated_node, pydantic.__name__, [ConfigDict.__name__]
+        )
 
 
 class PydanticConfigToModelConfig(
@@ -221,9 +174,12 @@ class PydanticConfigToModelConfig(
         default="Config",
         description="Name of the nested configuration class to convert. Defaults to 'Config'.",
     )
+    import_adder: ModuleImportAdder = Field(default_factory=ModuleImportAdder)
 
     def _create_transformer(self) -> _PydanticConfigToModelConfigTransformer:
-        return _PydanticConfigToModelConfigTransformer(self.config_class_name)
+        return _PydanticConfigToModelConfigTransformer(
+            self.config_class_name, self.import_adder
+        )
 
     def _modify_file(self, file_data: FileData) -> bool:
         if f"class {self.config_class_name}" not in file_data.content:
