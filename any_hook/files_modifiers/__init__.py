@@ -2,6 +2,7 @@ from typing import Annotated
 from typing import Union
 
 from any_hook.files_modifiers.forbidden_functions import ForbiddenFunctions
+from any_hook.files_modifiers.len_as_bool import LenAsBool
 from any_hook.files_modifiers.local_imports import LocalImports
 from any_hook.files_modifiers.object_to_any import ObjectToAny
 from any_hook.files_modifiers.pydantic_config_to_model_config import (
@@ -21,6 +22,7 @@ AnyModifier = Annotated[
         LocalImports,
         ForbiddenFunctions,
         UtcNowToDatetimeNow,
+        LenAsBool,
     ],
     Field(discriminator="type"),
 ]
@@ -32,6 +34,7 @@ __all__ = [
     "LocalImports",
     "ForbiddenFunctions",
     "UtcNowToDatetimeNow",
+    "LenAsBool",
     "AnyModifier",
 ]
 try:
