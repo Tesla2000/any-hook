@@ -1,12 +1,12 @@
 from textwrap import dedent
-from unittest import TestCase
 
 from any_hook.files_modifiers._import_adder import ModuleImportAdder
 from any_hook.files_modifiers.utcnow_to_datetime_now import _UtcNowTransformer
 from libcst import parse_module
+from tests.modifiers._base import TransformerTestCase
 
 
-class TestUtcNowToDatetimeNow(TestCase):
+class TestUtcNowToDatetimeNow(TransformerTestCase):
     def test_simple_call(self):
         code = dedent("""
             from datetime import datetime
@@ -221,11 +221,5 @@ class TestUtcNowToDatetimeNow(TestCase):
         code = "result = obj.utcnow()\n"
         self._assert_no_transformation(code)
 
-    def _assert_transformation(self, original: str, expected: str) -> None:
-        module = parse_module(original)
-        transformer = _UtcNowTransformer(ModuleImportAdder())
-        transformed = module.visit(transformer)
-        self.assertEqual(transformed.code, expected)
-
-    def _assert_no_transformation(self, code: str) -> None:
-        self._assert_transformation(code, code)
+    def _create_transformer(self) -> _UtcNowTransformer:
+        return _UtcNowTransformer(ModuleImportAdder())

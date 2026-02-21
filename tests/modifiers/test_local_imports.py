@@ -1,13 +1,13 @@
 from pathlib import Path
 from textwrap import dedent
-from unittest import TestCase
 
 from any_hook._file_data import FileData
 from any_hook.files_modifiers.local_imports import LocalImports
 from libcst import parse_module
+from tests.modifiers._base import TransformerTestCase
 
 
-class TestLocalImports(TestCase):
+class TestLocalImports(TransformerTestCase):
     def test_detects_import_in_function(self):
         code = dedent("""
             def foo():
@@ -136,14 +136,15 @@ class TestLocalImports(TestCase):
         self.assertTrue(result)
 
     def _check_code(self, code: str) -> bool:
-        module = parse_module(code)
-        file_data = FileData(path=Path("test.py"), content=code, module=module)
-        modifier = LocalImports()
-        return modifier.modify([file_data])
+        file_data = FileData(
+            path=Path("test.py"), content=code, module=parse_module(code)
+        )
+        return LocalImports().modify([file_data])
 
     def _check_code_with_modifier(
         self, code: str, modifier: LocalImports
     ) -> bool:
-        module = parse_module(code)
-        file_data = FileData(path=Path("test.py"), content=code, module=module)
+        file_data = FileData(
+            path=Path("test.py"), content=code, module=parse_module(code)
+        )
         return modifier.modify([file_data])

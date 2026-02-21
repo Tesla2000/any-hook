@@ -1,13 +1,13 @@
 from pathlib import Path
 from textwrap import dedent
-from unittest import TestCase
 
 from any_hook._file_data import FileData
 from any_hook.files_modifiers.forbidden_functions import ForbiddenFunctions
 from libcst import parse_module
+from tests.modifiers._base import TransformerTestCase
 
 
-class TestForbiddenFunctions(TestCase):
+class TestForbiddenFunctions(TransformerTestCase):
     def test_detects_simple_hasattr(self):
         code = dedent("""
             obj = object()
@@ -116,16 +116,19 @@ class TestForbiddenFunctions(TestCase):
         self.assertTrue(result)
 
     def _check_code(self, code: str) -> bool:
-        module = parse_module(code)
-        file_data = FileData(path=Path("test.py"), content=code, module=module)
-        modifier = ForbiddenFunctions(forbidden_functions=(hasattr.__name__,))
-        return modifier.modify([file_data])
+        file_data = FileData(
+            path=Path("test.py"), content=code, module=parse_module(code)
+        )
+        return ForbiddenFunctions(
+            forbidden_functions=(hasattr.__name__,)
+        ).modify([file_data])
 
     def _check_code_with_modifier(
         self, code: str, modifier: ForbiddenFunctions
     ) -> bool:
-        module = parse_module(code)
-        file_data = FileData(path=Path("test.py"), content=code, module=module)
+        file_data = FileData(
+            path=Path("test.py"), content=code, module=parse_module(code)
+        )
         return modifier.modify([file_data])
 
     def test_detects_getattr_when_configured(self):

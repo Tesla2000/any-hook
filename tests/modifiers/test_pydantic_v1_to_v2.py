@@ -1,13 +1,12 @@
 from textwrap import dedent
-from unittest import TestCase
 
 from any_hook.files_modifiers.pydantic_v1_to_v2 import (
     _PydanticV1ToV2Transformer,
 )
-from libcst import parse_module
+from tests.modifiers._base import TransformerTestCase
 
 
-class TestPydanticV1ToV2(TestCase):
+class TestPydanticV1ToV2(TransformerTestCase):
     def test_simple_import_from(self):
         code = "from pydantic.v1 import BaseModel"
         expected = "from pydantic import BaseModel"
@@ -175,12 +174,5 @@ class TestPydanticV1ToV2(TestCase):
         """).lstrip()
         self._assert_transformation(code, expected)
 
-    def _assert_transformation(self, original: str, expected: str) -> None:
-        module = parse_module(original)
-        transformer = _PydanticV1ToV2Transformer()
-        transformed = module.visit(transformer)
-        result = transformed.code
-        self.assertEqual(result, expected)
-
-    def _assert_no_transformation(self, code: str) -> None:
-        self._assert_transformation(code, code)
+    def _create_transformer(self) -> _PydanticV1ToV2Transformer:
+        return _PydanticV1ToV2Transformer()

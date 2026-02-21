@@ -1,12 +1,11 @@
 from textwrap import dedent
-from unittest import TestCase
 
 from any_hook.files_modifiers._import_adder import ModuleImportAdder
 from any_hook.files_modifiers.object_to_any import _ObjectToAnyTransformer
-from libcst import parse_module
+from tests.modifiers._base import TransformerTestCase
 
 
-class TestObjectToAny(TestCase):
+class TestObjectToAny(TransformerTestCase):
     def test_simple_object_annotation(self):
         code = "def foo(x: object) -> object:\n    return x"
         expected = (
@@ -203,12 +202,5 @@ class TestObjectToAny(TestCase):
         """).lstrip()
         self._assert_transformation(code, expected)
 
-    def _assert_transformation(self, original: str, expected: str) -> None:
-        module = parse_module(original)
-        transformer = _ObjectToAnyTransformer(ModuleImportAdder())
-        transformed = module.visit(transformer)
-        result = transformed.code
-        self.assertEqual(result, expected)
-
-    def _assert_no_transformation(self, code: str) -> None:
-        self._assert_transformation(code, code)
+    def _create_transformer(self) -> _ObjectToAnyTransformer:
+        return _ObjectToAnyTransformer(ModuleImportAdder())

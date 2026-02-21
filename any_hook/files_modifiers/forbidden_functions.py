@@ -3,7 +3,7 @@ from collections.abc import Iterable
 from typing import Literal
 
 from any_hook._file_data import FileData
-from any_hook.files_modifiers._modifier import Modifier
+from any_hook.files_modifiers._base import Modifier
 from libcst import Call
 from libcst import CSTVisitor
 from libcst import Expr

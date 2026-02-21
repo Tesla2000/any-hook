@@ -5,7 +5,7 @@ from typing import Generic
 from typing import TypeVar
 
 from any_hook._file_data import FileData
-from any_hook.files_modifiers._modifier import Modifier
+from any_hook.files_modifiers._base import Modifier
 from libcst import CSTTransformer
 from pydantic import ConfigDict
 

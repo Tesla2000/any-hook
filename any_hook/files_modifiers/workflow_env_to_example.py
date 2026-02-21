@@ -5,7 +5,7 @@ from typing import Literal
 
 import yaml
 from any_hook._file_data import FileData
-from any_hook.files_modifiers._modifier import Modifier
+from any_hook.files_modifiers._base import Modifier
 from pydantic import BaseModel
 from pydantic import Field
 

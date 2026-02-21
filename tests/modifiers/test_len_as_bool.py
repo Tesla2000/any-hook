@@ -1,11 +1,10 @@
 from textwrap import dedent
-from unittest import TestCase
 
 from any_hook.files_modifiers.len_as_bool import _LenAsBoolTransformer
-from libcst import parse_module
+from tests.modifiers._base import TransformerTestCase
 
 
-class TestLenAsBool(TestCase):
+class TestLenAsBool(TransformerTestCase):
     def test_if_len(self):
         code = dedent("""
             if len(x):
@@ -120,10 +119,5 @@ class TestLenAsBool(TestCase):
         """).lstrip()
         self._assert_transformation(code, expected)
 
-    def _assert_transformation(self, original: str, expected: str) -> None:
-        module = parse_module(original)
-        transformed = module.visit(_LenAsBoolTransformer())
-        self.assertEqual(transformed.code, expected)
-
-    def _assert_no_transformation(self, code: str) -> None:
-        self._assert_transformation(code, code)
+    def _create_transformer(self) -> _LenAsBoolTransformer:
+        return _LenAsBoolTransformer()

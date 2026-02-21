@@ -1,14 +1,14 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from textwrap import dedent
-from unittest import TestCase
 
 from any_hook._file_data import FileData
 from any_hook.files_modifiers.str_enum_inheritance import StrEnumInheritance
 from libcst import parse_module
+from tests.modifiers._base import TransformerTestCase
 
 
-class TestStrEnumInheritance(TestCase):
+class TestStrEnumInheritance(TransformerTestCase):
     def test_converts_str_enum_inheritance_to_strenum(self):
         original_code = dedent("""
             from enum import Enum
