@@ -9,6 +9,7 @@ from any_hook.files_modifiers.pydantic_config_to_model_config import (
 )
 from any_hook.files_modifiers.pydantic_v1_to_v2 import PydanticV1ToV2
 from any_hook.files_modifiers.str_enum_inheritance import StrEnumInheritance
+from any_hook.files_modifiers.utcnow_to_datetime_now import UtcNowToDatetimeNow
 from pydantic import Field
 
 AnyModifier = Annotated[
@@ -19,6 +20,7 @@ AnyModifier = Annotated[
         StrEnumInheritance,
         LocalImports,
         ForbiddenFunctions,
+        UtcNowToDatetimeNow,
     ],
     Field(discriminator="type"),
 ]
@@ -29,6 +31,7 @@ __all__ = [
     "StrEnumInheritance",
     "LocalImports",
     "ForbiddenFunctions",
+    "UtcNowToDatetimeNow",
     "AnyModifier",
 ]
 try:

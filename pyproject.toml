@@ -4,7 +4,7 @@ version = "1.0.3"
 description = "Group of pre-commit hooks of various purpouses"
 authors = [{name = "Tesla2000", email = "fratajczak124@gmail.com"}]
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
     "python-dotenv>=1.0.1",
     "pydantic>=2.8.2",

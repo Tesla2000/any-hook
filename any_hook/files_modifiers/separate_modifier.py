@@ -19,6 +19,8 @@ class SeparateModifier(Modifier, ABC, Generic[TransformerType]):
         return any(map(self._modify_file, data))
 
     def _modify_file(self, file_data: FileData) -> bool:
+        if not self._should_process_file(file_data.path):
+            return False
         new_code = file_data.module.visit(self._create_transformer()).code
         if new_code == file_data.content:
             return False
