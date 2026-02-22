@@ -4,6 +4,7 @@ from libcst import EmptyLine
 from libcst import ImportAlias
 from libcst import ImportFrom
 from libcst import ImportStar
+from libcst import MaybeSentinel
 from libcst import Module
 from libcst import Name
 from libcst import SimpleStatementLine
@@ -59,6 +60,12 @@ class ModuleImportAdder(BaseModel):
                         if n not in existing_names
                     ]
                     merged = kept + new_entries
+                    if merged and not isinstance(
+                        merged[-1].comma, MaybeSentinel
+                    ):
+                        merged[-1] = merged[-1].with_changes(
+                            comma=MaybeSentinel.DEFAULT
+                        )
                     if merged:
                         new_import = import_node.with_changes(names=merged)
                         new_body.append(
