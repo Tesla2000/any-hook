@@ -1,6 +1,7 @@
 from typing import Annotated
 from typing import Union
 
+from any_hook.files_modifiers.field_validator_check import FieldValidatorCheck
 from any_hook.files_modifiers.forbidden_functions import ForbiddenFunctions
 from any_hook.files_modifiers.len_as_bool import LenAsBool
 from any_hook.files_modifiers.local_imports import LocalImports
@@ -22,6 +23,7 @@ AnyModifier = Annotated[
         StrEnumInheritance,
         LocalImports,
         ForbiddenFunctions,
+        FieldValidatorCheck,
         UtcNowToDatetimeNow,
         LenAsBool,
         TypingToBuiltin,
@@ -35,6 +37,7 @@ __all__ = [
     "StrEnumInheritance",
     "LocalImports",
     "ForbiddenFunctions",
+    "FieldValidatorCheck",
     "UtcNowToDatetimeNow",
     "LenAsBool",
     "TypingToBuiltin",
