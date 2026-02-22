@@ -1,7 +1,11 @@
 import enum
+import re
 from typing import Literal
 
 from any_hook._file_data import FileData
+from any_hook.files_modifiers._ignore_aware_transformer import (
+    IgnoreAwareTransformer,
+)
 from any_hook.files_modifiers._import_adder import ModuleImportAdder
 from any_hook.files_modifiers.separate_modifier import SeparateModifier
 from libcst import AnnAssign
@@ -10,7 +14,6 @@ from libcst import Assign
 from libcst import AssignTarget
 from libcst import Call
 from libcst import ClassDef
-from libcst import CSTTransformer
 from libcst import ImportFrom
 from libcst import ImportStar
 from libcst import Module
@@ -21,14 +24,15 @@ from libcst.helpers import get_absolute_module_for_import
 from pydantic import Field
 
 
-class _StrEnumInheritanceTransformer(CSTTransformer):
+class _StrEnumInheritanceTransformer(IgnoreAwareTransformer):
     def __init__(
         self,
+        ignore_pattern: re.Pattern[str],
         convert_to_auto: bool = False,
         convert_existing_str_enum: bool = False,
         import_adder: ModuleImportAdder = ModuleImportAdder(),
     ) -> None:
-        super().__init__()
+        super().__init__(ignore_pattern)
         self._import_adder = import_adder
         self._convert_to_auto = convert_to_auto
         self._convert_existing_str_enum = convert_existing_str_enum
@@ -55,6 +59,7 @@ class _StrEnumInheritanceTransformer(CSTTransformer):
         return False
 
     def visit_ClassDef(self, node: ClassDef) -> bool:
+        self._push_compound_ignore(node)
         if not node.bases:
             return True
         if len(node.bases) == 2:
@@ -76,6 +81,9 @@ class _StrEnumInheritanceTransformer(CSTTransformer):
 
     def leave_ClassDef(self, _: ClassDef, updated_node: ClassDef) -> ClassDef:
         self._in_str_enum_class = False
+        ignored = self._pop_compound_ignore()
+        if ignored:
+            return updated_node
         if not updated_node.bases:
             return updated_node
         if len(updated_node.bases) != 2:
@@ -92,7 +100,11 @@ class _StrEnumInheritanceTransformer(CSTTransformer):
         return updated_node
 
     def leave_Assign(self, _: Assign, updated_node: Assign) -> Assign:
-        if not self._convert_to_auto or not self._in_str_enum_class:
+        if (
+            not self._convert_to_auto
+            or not self._in_str_enum_class
+            or self._is_currently_ignored()
+        ):
             return updated_node
         if not isinstance(updated_node.value, SimpleString):
             return updated_node
@@ -116,7 +128,11 @@ class _StrEnumInheritanceTransformer(CSTTransformer):
     def leave_AnnAssign(
         self, _: AnnAssign, updated_node: AnnAssign
     ) -> AnnAssign:
-        if not self._convert_to_auto or not self._in_str_enum_class:
+        if (
+            not self._convert_to_auto
+            or not self._in_str_enum_class
+            or self._is_currently_ignored()
+        ):
             return updated_node
         if updated_node.value is None or not isinstance(
             updated_node.value, SimpleString
@@ -202,8 +218,11 @@ class StrEnumInheritance(SeparateModifier[_StrEnumInheritanceTransformer]):
     )
     import_adder: ModuleImportAdder = Field(default_factory=ModuleImportAdder)
 
-    def _create_transformer(self) -> _StrEnumInheritanceTransformer:
+    def _create_transformer(
+        self, ignore_pattern: re.Pattern[str]
+    ) -> _StrEnumInheritanceTransformer:
         return _StrEnumInheritanceTransformer(
+            ignore_pattern,
             convert_to_auto=self.convert_to_auto,
             convert_existing_str_enum=self.convert_existing_str_enum,
             import_adder=self.import_adder,

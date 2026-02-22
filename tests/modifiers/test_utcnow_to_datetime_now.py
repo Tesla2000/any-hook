@@ -1,3 +1,4 @@
+import re
 from textwrap import dedent
 
 from any_hook.files_modifiers._import_adder import ModuleImportAdder
@@ -194,7 +195,11 @@ class TestUtcNowToDatetimeNow(TransformerTestCase):
         """).lstrip()
         self._assert_transformation(code, expected)
         module = parse_module(code)
-        result = module.visit(_UtcNowTransformer(ModuleImportAdder()))
+        result = module.visit(
+            _UtcNowTransformer(
+                re.compile(r"#\s*ignore", re.IGNORECASE), ModuleImportAdder()
+            )
+        )
         self.assertNotIn("from datetime import", result.code)
 
     def test_module_style_multiple_occurrences(self):
@@ -222,4 +227,6 @@ class TestUtcNowToDatetimeNow(TransformerTestCase):
         self._assert_no_transformation(code)
 
     def _create_transformer(self) -> _UtcNowTransformer:
-        return _UtcNowTransformer(ModuleImportAdder())
+        return _UtcNowTransformer(
+            re.compile(r"#\s*ignore", re.IGNORECASE), ModuleImportAdder()
+        )

@@ -1,3 +1,4 @@
+import re
 from textwrap import dedent
 
 from any_hook.files_modifiers.pydantic_v1_to_v2 import (
@@ -175,4 +176,6 @@ class TestPydanticV1ToV2(TransformerTestCase):
         self._assert_transformation(code, expected)
 
     def _create_transformer(self) -> _PydanticV1ToV2Transformer:
-        return _PydanticV1ToV2Transformer()
+        return _PydanticV1ToV2Transformer(
+            re.compile(r"#\s*ignore", re.IGNORECASE)
+        )

@@ -1,3 +1,4 @@
+import re
 from textwrap import dedent
 
 from any_hook.files_modifiers.len_as_bool import _LenAsBoolTransformer
@@ -120,4 +121,4 @@ class TestLenAsBool(TransformerTestCase):
         self._assert_transformation(code, expected)
 
     def _create_transformer(self) -> _LenAsBoolTransformer:
-        return _LenAsBoolTransformer()
+        return _LenAsBoolTransformer(re.compile(r"#\s*ignore", re.IGNORECASE))

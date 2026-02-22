@@ -1,7 +1,11 @@
+import re
 from typing import Literal
 
 import pydantic
 from any_hook._file_data import FileData
+from any_hook.files_modifiers._ignore_aware_transformer import (
+    IgnoreAwareTransformer,
+)
 from any_hook.files_modifiers._import_adder import ModuleImportAdder
 from any_hook.files_modifiers.separate_modifier import SeparateModifier
 from libcst import Arg
@@ -10,7 +14,6 @@ from libcst import AssignEqual
 from libcst import AssignTarget
 from libcst import Call
 from libcst import ClassDef
-from libcst import CSTTransformer
 from libcst import ImportFrom
 from libcst import IndentedBlock
 from libcst import Module
@@ -21,11 +24,14 @@ from pydantic import ConfigDict
 from pydantic import Field
 
 
-class _PydanticConfigToModelConfigTransformer(CSTTransformer):
+class _PydanticConfigToModelConfigTransformer(IgnoreAwareTransformer):
     def __init__(
-        self, config_class_name: str, import_adder: ModuleImportAdder
+        self,
+        ignore_pattern: re.Pattern[str],
+        config_class_name: str,
+        import_adder: ModuleImportAdder,
     ) -> None:
-        super().__init__()
+        super().__init__(ignore_pattern)
         self._import_adder = import_adder
         self._made_changes = False
         self._has_config_dict_import = False
@@ -34,11 +40,15 @@ class _PydanticConfigToModelConfigTransformer(CSTTransformer):
 
     def visit_ClassDef(self, node: ClassDef) -> bool:
         self._current_class_depth += 1
+        self._push_compound_ignore(node)
         return True
 
     def leave_ClassDef(self, _: ClassDef, updated_node: ClassDef) -> ClassDef:
         self._current_class_depth -= 1
+        ignored = self._pop_compound_ignore()
         if self._current_class_depth != 0:
+            return updated_node
+        if ignored:
             return updated_node
         if not isinstance(updated_node.body, IndentedBlock):
             return updated_node
@@ -176,9 +186,11 @@ class PydanticConfigToModelConfig(
     )
     import_adder: ModuleImportAdder = Field(default_factory=ModuleImportAdder)
 
-    def _create_transformer(self) -> _PydanticConfigToModelConfigTransformer:
+    def _create_transformer(
+        self, ignore_pattern: re.Pattern[str]
+    ) -> _PydanticConfigToModelConfigTransformer:
         return _PydanticConfigToModelConfigTransformer(
-            self.config_class_name, self.import_adder
+            ignore_pattern, self.config_class_name, self.import_adder
         )
 
     def _modify_file(self, file_data: FileData) -> bool:

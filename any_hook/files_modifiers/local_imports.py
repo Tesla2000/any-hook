@@ -11,7 +11,6 @@ from libcst import Import
 from libcst import ImportFrom
 from libcst import Module
 from libcst import SimpleStatementLine
-from pydantic import Field
 
 
 class _LocalImportVisitor(CSTVisitor):
@@ -100,10 +99,6 @@ class LocalImports(Modifier):
     """
 
     type: Literal["local-imports"] = "local-imports"
-    ignore_pattern: str = Field(
-        default=r"#\s*ignore",
-        description="Regex pattern to match ignore comments that suppress local import warnings.",
-    )
 
     def modify(self, data: Iterable[FileData]) -> bool:
         return any(self._check_file(file_data) for file_data in data)

@@ -1,3 +1,4 @@
+import re
 from abc import ABC
 from abc import abstractmethod
 from collections.abc import Iterable
@@ -21,7 +22,10 @@ class SeparateModifier(Modifier, ABC, Generic[TransformerType]):
     def _modify_file(self, file_data: FileData) -> bool:
         if not self._should_process_file(file_data.path):
             return False
-        new_code = file_data.module.visit(self._create_transformer()).code
+        compiled = re.compile(self.ignore_pattern, re.IGNORECASE)
+        new_code = file_data.module.visit(
+            self._create_transformer(compiled)
+        ).code
         if new_code == file_data.content:
             return False
         file_data.path.write_text(new_code)
@@ -29,5 +33,7 @@ class SeparateModifier(Modifier, ABC, Generic[TransformerType]):
         return True
 
     @abstractmethod
-    def _create_transformer(self) -> TransformerType:
+    def _create_transformer(
+        self, ignore_pattern: re.Pattern[str]
+    ) -> TransformerType:
         pass

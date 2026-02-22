@@ -1,23 +1,28 @@
+import re
 from typing import Literal
 
 from any_hook._file_data import FileData
+from any_hook.files_modifiers._ignore_aware_transformer import (
+    IgnoreAwareTransformer,
+)
 from any_hook.files_modifiers.separate_modifier import SeparateModifier
 from libcst import Attribute
-from libcst import CSTTransformer
 from libcst import Dot
 from libcst import Import
 from libcst import ImportFrom
 from libcst import Name
 
 
-class _PydanticV1ToV2Transformer(CSTTransformer):
-    def __init__(self) -> None:
-        super().__init__()
+class _PydanticV1ToV2Transformer(IgnoreAwareTransformer):
+    def __init__(self, ignore_pattern: re.Pattern[str]) -> None:
+        super().__init__(ignore_pattern)
         self._made_changes = False
 
     def leave_ImportFrom(
         self, _: ImportFrom, updated_node: ImportFrom
     ) -> ImportFrom:
+        if self._is_currently_ignored():
+            return updated_node
         if not updated_node.module:
             return updated_node
         module_parts = self._get_module_parts(updated_node.module)
@@ -35,6 +40,8 @@ class _PydanticV1ToV2Transformer(CSTTransformer):
         return updated_node
 
     def leave_Import(self, _: Import, updated_node: Import) -> Import:
+        if self._is_currently_ignored():
+            return updated_node
         new_names = []
         made_change = False
         for alias in updated_node.names:
@@ -64,6 +71,8 @@ class _PydanticV1ToV2Transformer(CSTTransformer):
     def leave_Attribute(
         self, _: Attribute, updated_node: Attribute
     ) -> Attribute:
+        if self._is_currently_ignored():
+            return updated_node
         if not isinstance(updated_node.value, Name):
             return updated_node
         if (
@@ -116,8 +125,10 @@ class PydanticV1ToV2(SeparateModifier[_PydanticV1ToV2Transformer]):
 
     type: Literal["pydantic-v1-to-v2"] = "pydantic-v1-to-v2"
 
-    def _create_transformer(self) -> _PydanticV1ToV2Transformer:
-        return _PydanticV1ToV2Transformer()
+    def _create_transformer(
+        self, ignore_pattern: re.Pattern[str]
+    ) -> _PydanticV1ToV2Transformer:
+        return _PydanticV1ToV2Transformer(ignore_pattern)
 
     def _modify_file(self, file_data: FileData) -> bool:
         if "pydantic.v1" not in file_data.content:

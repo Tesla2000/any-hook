@@ -1,3 +1,4 @@
+import re
 from textwrap import dedent
 
 from any_hook.files_modifiers._import_adder import ModuleImportAdder
@@ -220,5 +221,7 @@ class TestPydanticConfigToModelConfig(TransformerTestCase):
 
     def _create_transformer(self) -> _PydanticConfigToModelConfigTransformer:
         return _PydanticConfigToModelConfigTransformer(
-            "Config", ModuleImportAdder()
+            re.compile(r"#\s*ignore", re.IGNORECASE),
+            "Config",
+            ModuleImportAdder(),
         )

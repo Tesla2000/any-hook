@@ -1,13 +1,16 @@
+import re
 import typing
 from typing import Any
 from typing import Literal
 
 from any_hook._file_data import FileData
+from any_hook.files_modifiers._ignore_aware_transformer import (
+    IgnoreAwareTransformer,
+)
 from any_hook.files_modifiers._import_adder import ModuleImportAdder
 from any_hook.files_modifiers.separate_modifier import SeparateModifier
 from libcst import Annotation
 from libcst import Attribute
-from libcst import CSTTransformer
 from libcst import ImportFrom
 from libcst import ImportStar
 from libcst import Module
@@ -17,9 +20,11 @@ from libcst.helpers import get_absolute_module_for_import
 from pydantic import Field
 
 
-class _ObjectToAnyTransformer(CSTTransformer):
-    def __init__(self, import_adder: ModuleImportAdder) -> None:
-        super().__init__()
+class _ObjectToAnyTransformer(IgnoreAwareTransformer):
+    def __init__(
+        self, ignore_pattern: re.Pattern[str], import_adder: ModuleImportAdder
+    ) -> None:
+        super().__init__(ignore_pattern)
         self._import_adder = import_adder
         self._in_annotation = False
         self._in_subscript = 0
@@ -73,6 +78,7 @@ class _ObjectToAnyTransformer(CSTTransformer):
             (self._in_annotation or self._in_subscript > 0)
             and updated_node.value == object.__name__
             and not self._in_attribute
+            and not self._is_currently_ignored()
         ):
             self._made_changes = True
             return Name(Any.__name__)
@@ -111,8 +117,10 @@ class ObjectToAny(SeparateModifier[_ObjectToAnyTransformer]):
     type: Literal["object-to-any"] = "object-to-any"
     import_adder: ModuleImportAdder = Field(default_factory=ModuleImportAdder)
 
-    def _create_transformer(self) -> _ObjectToAnyTransformer:
-        return _ObjectToAnyTransformer(self.import_adder)
+    def _create_transformer(
+        self, ignore_pattern: re.Pattern[str]
+    ) -> _ObjectToAnyTransformer:
+        return _ObjectToAnyTransformer(ignore_pattern, self.import_adder)
 
     def _modify_file(self, file_data: FileData) -> bool:
         if object.__name__ not in file_data.content:

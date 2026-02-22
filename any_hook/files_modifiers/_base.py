@@ -45,6 +45,10 @@ class Modifier(BaseModel, ABC):
 
     model_config = ConfigDict(extra="forbid")
 
+    ignore_pattern: str = Field(
+        default=r"#\s*ignore",
+        description="Regex pattern to match inline comments that suppress this modifier.",
+    )
     outputs: tuple[AnyOutput, ...] = Field(
         default=(StandardOutput(),),
         description="Output channels for reporting modifications or violations. Defaults to standard output.",

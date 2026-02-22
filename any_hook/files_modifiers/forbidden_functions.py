@@ -91,10 +91,6 @@ class ForbiddenFunctions(Modifier):
     """
 
     type: Literal["forbidden-functions"] = "forbidden-functions"
-    ignore_pattern: str = Field(
-        default=r"#\s*ignore",
-        description="Regex pattern to match ignore comments that suppress forbidden function warnings.",
-    )
     forbidden_functions: tuple[str, ...] = Field(
         description="Tuple of function names that should not be called in the codebase.",
     )

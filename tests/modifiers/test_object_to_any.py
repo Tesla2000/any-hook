@@ -1,3 +1,4 @@
+import re
 from textwrap import dedent
 
 from any_hook.files_modifiers._import_adder import ModuleImportAdder
@@ -203,4 +204,6 @@ class TestObjectToAny(TransformerTestCase):
         self._assert_transformation(code, expected)
 
     def _create_transformer(self) -> _ObjectToAnyTransformer:
-        return _ObjectToAnyTransformer(ModuleImportAdder())
+        return _ObjectToAnyTransformer(
+            re.compile(r"#\s*ignore", re.IGNORECASE), ModuleImportAdder()
+        )
