@@ -1,6 +1,7 @@
 from typing import Annotated
 from typing import Union
 
+from any_hook.files_modifiers._base import Modifier
 from any_hook.files_modifiers.field_validator_check import FieldValidatorCheck
 from any_hook.files_modifiers.forbidden_functions import ForbiddenFunctions
 from any_hook.files_modifiers.len_as_bool import LenAsBool
@@ -31,6 +32,7 @@ AnyModifier = Annotated[
     Field(discriminator="type"),
 ]
 __all__ = [
+    "Modifier",
     "ObjectToAny",
     "PydanticConfigToModelConfig",
     "PydanticV1ToV2",

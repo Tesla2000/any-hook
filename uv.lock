@@ -27,7 +27,7 @@ wheels = [
 
 [[package]]
 name = "any-hook"
-version = "1.0.7"
+version = "1.0.9"
 source = { editable = "." }
 dependencies = [
     { name = "libcst" },
@@ -35,6 +35,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "python-dotenv" },
+    { name = "subclass-getter" },
     { name = "transaction" },
 ]
 
@@ -59,6 +60,7 @@ requires-dist = [
     { name = "sphinx", marker = "extra == 'docs'", specifier = ">=7.0.0" },
     { name = "sphinx-autodoc-typehints", marker = "extra == 'docs'", specifier = ">=1.24.0" },
     { name = "sphinx-rtd-theme", marker = "extra == 'docs'", specifier = ">=1.3.0" },
+    { name = "subclass-getter", git = "https://github.com/Tesla2000/subclass-getter.git" },
     { name = "transaction", specifier = ">=5.0" },
 ]
 provides-extras = ["workflow-env-to-example", "docs"]
@@ -659,6 +661,11 @@ sdist = { url = "https://files.pythonhosted.org/packages/3b/44/6716b257b0aa6bfd5
 wheels = [
     { url = "https://files.pythonhosted.org/packages/52/a7/d2782e4e3f77c8450f727ba74a8f12756d5ba823d81b941f1b04da9d033a/sphinxcontrib_serializinghtml-2.0.0-py3-none-any.whl", hash = "sha256:6e2cb0eef194e10c27ec0023bfeb25badbbb5868244cf5bc5bdc04e4464bf331", size = 92072, upload-time = "2024-07-29T01:10:08.203Z" },
 ]
+
+[[package]]
+name = "subclass-getter"
+version = "0.1.4"
+source = { git = "https://github.com/Tesla2000/subclass-getter.git#085522262cc4b7a6fc528ab5b6fef4b25a6a2718" }
 
 [[package]]
 name = "transaction"
