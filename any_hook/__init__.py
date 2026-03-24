@@ -1,4 +1,5 @@
 from any_hook.__main__ import Main
+from any_hook._file_data import FileData
 
 
 class _Main:
@@ -7,4 +8,7 @@ class _Main:
 
 
 main = _Main()
-__all__ = ["main"]
+__all__ = [
+    "main",
+    "FileData",
+]
