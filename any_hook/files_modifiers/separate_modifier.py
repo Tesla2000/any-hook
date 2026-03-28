@@ -17,7 +17,7 @@ class SeparateModifier(Modifier, ABC, Generic[TransformerType]):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     def modify(self, data: Iterable[FileData]) -> bool:
-        return any(map(self._modify_file, data))
+        return bool(list(map(self._modify_file, data)))
 
     def _modify_file(self, file_data: FileData) -> bool:
         if not self._should_process_file(file_data.path):

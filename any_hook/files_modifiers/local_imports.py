@@ -101,7 +101,7 @@ class LocalImports(Modifier):
     type: Literal["local-imports"] = "local-imports"
 
     def modify(self, data: Iterable[FileData]) -> bool:
-        return any(self._check_file(file_data) for file_data in data)
+        return bool(list(map(self._check_file, data)))
 
     def _check_file(self, file_data: FileData) -> bool:
         compiled_pattern = re.compile(self.ignore_pattern, re.IGNORECASE)
