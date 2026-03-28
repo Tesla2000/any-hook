@@ -27,7 +27,7 @@ class Main(BaseSettings):
     model_config = SettingsConfigDict(
         cli_parse_args=True,
     )
-    paths: CliPositionalArg[tuple[Path, ...]]
+    paths: CliPositionalArg[list[Path]]
     external_modifiers_path: Optional[Path] = None
     modifiers: tuple[AnyModifier, ...] = Field(min_length=1)
     convert_to_agito: bool = True
