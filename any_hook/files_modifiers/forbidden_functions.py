@@ -101,7 +101,7 @@ class ForbiddenFunctions(Modifier):
     def _check_file(self, file_data: FileData) -> bool:
         if not self.forbidden_functions:
             return False
-        if not self._should_process_file(file_data.path):
+        if not self.should_process_file(file_data.path):
             return False
         compiled_pattern = re.compile(self.ignore_pattern, re.IGNORECASE)
         visitor = _ForbiddenFunctionsVisitor(

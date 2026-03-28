@@ -92,7 +92,7 @@ class _LenAsBoolTransformer(IgnoreAwareTransformer):
 class LenAsBool(SeparateModifier[_LenAsBoolTransformer]):
     type: Literal["len-as-bool"] = "len-as-bool"
 
-    def _create_transformer(
+    def create_transformer(
         self, ignore_pattern: re.Pattern[str]
     ) -> _LenAsBoolTransformer:
         return _LenAsBoolTransformer(ignore_pattern)

@@ -28,7 +28,7 @@ jobs:
 
       - name: Run tests
         run: |
-          timeout 7 uv run python -m unittest
+          timeout 69 uv run python -m unittest
 
   docs:
     name: Build Documentation

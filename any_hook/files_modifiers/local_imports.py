@@ -104,6 +104,8 @@ class LocalImports(Modifier):
         return any(list(map(self._check_file, data)))
 
     def _check_file(self, file_data: FileData) -> bool:
+        if not self.should_process_file(file_data.path):
+            return False
         compiled_pattern = re.compile(self.ignore_pattern, re.IGNORECASE)
         visitor = _LocalImportVisitor(file_data.content, compiled_pattern)
         file_data.module.visit(visitor)

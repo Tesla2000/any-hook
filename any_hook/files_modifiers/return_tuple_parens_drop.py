@@ -60,7 +60,7 @@ class ReturnTupleParensDrop(
 ):
     type: Literal["return-tuple-parens-drop"] = "return-tuple-parens-drop"
 
-    def _create_transformer(
+    def create_transformer(
         self, ignore_pattern: re.Pattern[str]
     ) -> _ReturnTupleParensDropTransformer:
         return _ReturnTupleParensDropTransformer(ignore_pattern)
