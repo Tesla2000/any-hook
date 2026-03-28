@@ -125,7 +125,7 @@ class PydanticV1ToV2(SeparateModifier[_PydanticV1ToV2Transformer]):
 
     type: Literal["pydantic-v1-to-v2"] = "pydantic-v1-to-v2"
 
-    def _create_transformer(
+    def create_transformer(
         self, ignore_pattern: re.Pattern[str]
     ) -> _PydanticV1ToV2Transformer:
         return _PydanticV1ToV2Transformer(ignore_pattern)

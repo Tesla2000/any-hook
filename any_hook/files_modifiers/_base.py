@@ -74,7 +74,7 @@ class Modifier(BaseModel, ABC):
     def modify(self, data: Iterable[FileData]) -> bool:
         """Returns either 1 if file was modified 0 otherwise"""
 
-    def _should_process_file(self, path: Path) -> bool:
+    def should_process_file(self, path: Path) -> bool:
         if self.included_paths:
             return any(path.match(pattern) for pattern in self.included_paths)
         if self.excluded_paths:

@@ -175,7 +175,7 @@ class UtcNowToDatetimeNow(SeparateModifier[_UtcNowTransformer]):
     type: Literal["utcnow-to-datetime-now"] = "utcnow-to-datetime-now"
     import_adder: ModuleImportAdder = Field(default_factory=ModuleImportAdder)
 
-    def _create_transformer(
+    def create_transformer(
         self, ignore_pattern: re.Pattern[str]
     ) -> _UtcNowTransformer:
         return _UtcNowTransformer(ignore_pattern, self.import_adder)

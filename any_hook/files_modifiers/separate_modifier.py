@@ -20,11 +20,11 @@ class SeparateModifier(Modifier, ABC, Generic[TransformerType]):
         return any(list(map(self._modify_file, data)))
 
     def _modify_file(self, file_data: FileData) -> bool:
-        if not self._should_process_file(file_data.path):
+        if not self.should_process_file(file_data.path):
             return False
         compiled = re.compile(self.ignore_pattern, re.IGNORECASE)
         new_code = file_data.module.visit(
-            self._create_transformer(compiled)
+            self.create_transformer(compiled)
         ).code
         if new_code == file_data.content:
             return False
@@ -33,7 +33,7 @@ class SeparateModifier(Modifier, ABC, Generic[TransformerType]):
         return True
 
     @abstractmethod
-    def _create_transformer(
+    def create_transformer(
         self, ignore_pattern: re.Pattern[str]
     ) -> TransformerType:
         pass

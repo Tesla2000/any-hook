@@ -126,7 +126,7 @@ class TypingToBuiltin(SeparateModifier[_TypingToBuiltinTransformer]):
     type: Literal["typing-to-builtin"] = "typing-to-builtin"
     import_adder: ModuleImportAdder = Field(default_factory=ModuleImportAdder)
 
-    def _create_transformer(
+    def create_transformer(
         self, ignore_pattern: re.Pattern[str]
     ) -> _TypingToBuiltinTransformer:
         return _TypingToBuiltinTransformer(ignore_pattern, self.import_adder)

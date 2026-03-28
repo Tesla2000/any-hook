@@ -117,7 +117,7 @@ class ObjectToAny(SeparateModifier[_ObjectToAnyTransformer]):
     type: Literal["object-to-any"] = "object-to-any"
     import_adder: ModuleImportAdder = Field(default_factory=ModuleImportAdder)
 
-    def _create_transformer(
+    def create_transformer(
         self, ignore_pattern: re.Pattern[str]
     ) -> _ObjectToAnyTransformer:
         return _ObjectToAnyTransformer(ignore_pattern, self.import_adder)

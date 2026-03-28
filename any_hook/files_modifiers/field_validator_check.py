@@ -130,7 +130,7 @@ class FieldValidatorCheck(Modifier):
     def _check_file(self, file_data: FileData) -> bool:
         if "field_validator" not in file_data.content:
             return False
-        if not self._should_process_file(file_data.path):
+        if not self.should_process_file(file_data.path):
             return False
         compiled = re.compile(self.ignore_pattern, re.IGNORECASE)
         visitor = _FieldValidatorVisitor(file_data.content, compiled)

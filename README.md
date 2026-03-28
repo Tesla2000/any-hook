@@ -300,6 +300,34 @@ def foo():
     return x, y
 ```
 
+### agito
+
+Named after the shikigami from *Jujutsu Kaisen* born when Sukuna, wielding Megumi's Ten Shadows Technique, sacrifices all other shikigami and fuses them into one overwhelming entity — all except the Divine General Mahoraga. Agito fuses the power of every modifier it holds, running their transformations in a single CST pass per file instead of one pass each.
+
+**What it does:**
+- Merges all transformer-based modifiers (`SeparateModifier` subclasses) into one tree traversal per file
+- Eliminates redundant CST walks and reduces file writes to at most one per file
+- Checker-type modifiers (`forbidden-functions`, `field-validator-check`, `local-imports`) run after the combined transform since they only read the tree
+- `workflow-env-to-example` is the Mahoraga of the system — too autonomous to be absorbed and should be kept outside Agito
+
+**Options:**
+- `modifiers` (required) — list of modifier configs to combine
+
+**Example:**
+```json
+{
+  "type": "agito",
+  "modifiers": [
+    {"type": "len-as-bool"},
+    {"type": "typing-to-builtin"},
+    {"type": "return-tuple-parens-drop"},
+    {"type": "forbidden-functions", "forbidden_functions": ["print"]}
+  ]
+}
+```
+
+**Pre-commit shortcut:** set `convert_to_agito: true` (the default) on the CLI and pass modifiers normally — the runner wraps them in Agito automatically.
+
 ### pydantic-v1-to-v2
 
 Migrates Pydantic v1 imports to v2 compatibility imports.

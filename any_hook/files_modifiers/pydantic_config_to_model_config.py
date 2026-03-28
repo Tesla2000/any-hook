@@ -186,7 +186,7 @@ class PydanticConfigToModelConfig(
     )
     import_adder: ModuleImportAdder = Field(default_factory=ModuleImportAdder)
 
-    def _create_transformer(
+    def create_transformer(
         self, ignore_pattern: re.Pattern[str]
     ) -> _PydanticConfigToModelConfigTransformer:
         return _PydanticConfigToModelConfigTransformer(
