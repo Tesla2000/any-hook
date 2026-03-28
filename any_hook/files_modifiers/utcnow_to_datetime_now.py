@@ -1,5 +1,6 @@
 import datetime
 import re
+from typing import Any
 from typing import Literal
 
 from any_hook._file_data import FileData
@@ -120,7 +121,7 @@ class _UtcNowTransformer(IgnoreAwareTransformer):
         return self._import_adder.add(updated_node, datetime.__name__, ["UTC"])
 
     @staticmethod
-    def _is_class_utcnow(node: object) -> bool:
+    def _is_class_utcnow(node: Any) -> bool:
         return (
             isinstance(node, Attribute)
             and isinstance(node.value, Name)
@@ -129,7 +130,7 @@ class _UtcNowTransformer(IgnoreAwareTransformer):
         )
 
     @staticmethod
-    def _is_module_utcnow(node: object) -> bool:
+    def _is_module_utcnow(node: Any) -> bool:
         return (
             isinstance(node, Attribute)
             and isinstance(node.value, Attribute)

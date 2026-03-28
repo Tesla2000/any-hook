@@ -1,4 +1,5 @@
 import re
+from typing import Any
 from typing import Literal
 
 from any_hook._file_data import FileData
@@ -74,7 +75,7 @@ class _LenAsBoolTransformer(IgnoreAwareTransformer):
         return updated_node.with_changes(args=(Arg(value=inner_arg),))
 
     @staticmethod
-    def _is_len_call(node: object) -> bool:
+    def _is_len_call(node: Any) -> bool:
         return (
             isinstance(node, Call)
             and isinstance(node.func, Name)

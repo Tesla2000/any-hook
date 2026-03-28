@@ -11,6 +11,9 @@ from any_hook.files_modifiers.pydantic_config_to_model_config import (
     PydanticConfigToModelConfig,
 )
 from any_hook.files_modifiers.pydantic_v1_to_v2 import PydanticV1ToV2
+from any_hook.files_modifiers.return_tuple_parens_drop import (
+    ReturnTupleParensDrop,
+)
 from any_hook.files_modifiers.str_enum_inheritance import StrEnumInheritance
 from any_hook.files_modifiers.typing_to_builtin import TypingToBuiltin
 from any_hook.files_modifiers.utcnow_to_datetime_now import UtcNowToDatetimeNow
@@ -28,6 +31,7 @@ AnyModifier = Annotated[
         UtcNowToDatetimeNow,
         LenAsBool,
         TypingToBuiltin,
+        ReturnTupleParensDrop,
     ],
     Field(discriminator="type"),
 ]
@@ -43,6 +47,7 @@ __all__ = [
     "UtcNowToDatetimeNow",
     "LenAsBool",
     "TypingToBuiltin",
+    "ReturnTupleParensDrop",
     "AnyModifier",
 ]
 try:

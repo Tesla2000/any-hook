@@ -34,6 +34,31 @@ pip install any-hook[workflow-env-to-example]
 
 ## Available Modifiers
 
+All modifiers share the following common options:
+
+| Option | Default | Description |
+|---|---|---|
+| `excluded_paths` | `[]` | Glob patterns for paths to skip (e.g. `"tests/*"`, `"*/migrations/*"`). Cannot be combined with `included_paths`. |
+| `included_paths` | `[]` | Glob patterns for paths to include. When set, only matching files are processed. Cannot be combined with `excluded_paths`. |
+| `ignore_pattern` | `#\s*ignore` | Regex matched against inline comments to suppress a violation on that line. |
+
+**Example:**
+```json
+{
+  "type": "local-imports",
+  "excluded_paths": ["tests/*", "scripts/*"]
+}
+```
+
+```json
+{
+  "type": "forbidden-functions",
+  "forbidden_functions": ["print"],
+  "included_paths": ["src/*"],
+  "ignore_pattern": "#\\s*noqa"
+}
+```
+
 ### object-to-any
 
 Transforms `object` type hints to `Any` for better type checking compatibility.
@@ -79,14 +104,201 @@ def bar():
     return sys.version
 ```
 
-### str-enum-tuple
+### str-enum-inheritance
 
-Transforms string enums into tuples for better performance and immutability.
+Modernizes string enum definitions to use `StrEnum` (Python 3.11+).
 
 **What it does:**
-- Converts string literal enums to tuple definitions
-- Improves runtime performance
-- Ensures immutability
+- Converts classes inheriting from both `str` and `Enum` to use `StrEnum`
+- Optionally replaces string values with `auto()` when the value matches the member name in lowercase
+- Automatically updates imports (`StrEnum`, `auto`), removing `Enum` if no longer needed
+
+**Options:**
+- `convert_to_auto` (default: `true`) — replace matching string values with `auto()`
+- `convert_existing_str_enum` (default: `true`) — also apply `auto()` conversion to existing `StrEnum` classes
+
+**Example:**
+```python
+# Before
+from enum import Enum
+class Status(str, Enum):
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+
+# After
+from enum import StrEnum, auto
+class Status(StrEnum):
+    ACTIVE = auto()
+    INACTIVE = auto()
+```
+
+### pydantic-config-to-model-config
+
+Migrates Pydantic v1 nested `Config` classes to v2 `model_config = ConfigDict(...)`.
+
+**What it does:**
+- Converts inner `Config` classes to `model_config` assignments using `ConfigDict`
+- Automatically adds `ConfigDict` import if not present
+- Skips classes that already have `model_config` defined
+
+**Options:**
+- `config_class_name` (default: `"Config"`) — name of the nested config class to convert
+
+**Example:**
+```python
+# Before
+from pydantic import BaseModel
+class User(BaseModel):
+    name: str
+    class Config:
+        frozen = True
+        extra = "forbid"
+
+# After
+from pydantic import BaseModel, ConfigDict
+class User(BaseModel):
+    name: str
+    model_config = ConfigDict(frozen=True, extra="forbid")
+```
+
+### forbidden-functions
+
+Detects calls to forbidden function names.
+
+**What it does:**
+- Reports any direct function calls matching the specified names
+- Useful for banning `print`, `eval`, deprecated helpers, etc.
+- Only detects simple calls (`func()`) — method calls (`obj.func()`) are not flagged
+
+**Options:**
+- `forbidden_functions` (required) — tuple of function names to ban
+
+**Example:**
+```python
+# Flagged
+print("debug info")
+result = eval(user_input)
+
+# Suppressed
+print("temporary debug")  # ignore
+```
+
+**Configuration:**
+```json
+{"type": "forbidden-functions", "forbidden_functions": ["print", "eval"]}
+```
+
+### field-validator-check
+
+Detects misused Pydantic `@field_validator` decorators.
+
+**What it does:**
+- Reports validators where `cls` is not used in the method body and the validated fields do not include `"*"`
+- Suggests that such validators can likely be simplified
+
+**Example:**
+```python
+# Flagged — cls unused and field is not "*"
+@field_validator("name")
+@classmethod
+def validate_name(cls, v):
+    return v.strip()
+
+# OK — uses "*"
+@field_validator("*")
+@classmethod
+def validate_all(cls, v):
+    return cls._clean(v)
+```
+
+### utcnow-to-datetime-now
+
+Migrates deprecated `datetime.utcnow()` to timezone-aware `datetime.now(UTC)`.
+
+**What it does:**
+- Converts `datetime.utcnow()` → `datetime.now(UTC)` (class-style import)
+- Converts `datetime.datetime.utcnow()` → `datetime.datetime.now(datetime.UTC)` (module-style import)
+- Converts bare `datetime.utcnow` references to `lambda: datetime.now(UTC)`
+- Automatically adds `UTC` to the `datetime` import when needed
+
+**Example:**
+```python
+# Before
+from datetime import datetime
+now = datetime.utcnow()
+factory = datetime.utcnow
+
+# After
+from datetime import datetime, UTC
+now = datetime.now(UTC)
+factory = lambda: datetime.now(UTC)
+```
+
+### len-as-bool
+
+Removes unnecessary `len()` calls in boolean contexts.
+
+**What it does:**
+- Simplifies `if len(x):` → `if x:`
+- Simplifies `if not len(x):` → `if not x:`
+- Simplifies `bool(len(x))` → `bool(x)`
+- Also applies to `while` conditions
+
+**Example:**
+```python
+# Before
+if len(items):
+    process(items)
+while len(queue):
+    queue.pop()
+
+# After
+if items:
+    process(items)
+while queue:
+    queue.pop()
+```
+
+### typing-to-builtin
+
+Modernizes type hints from `typing` module to builtin equivalents (Python 3.9+).
+
+**What it does:**
+- Converts `Dict` → `dict`, `List` → `list`, `Set` → `set`, `FrozenSet` → `frozenset`, `Tuple` → `tuple`, `Type` → `type`
+- Only replaces names used in annotations
+- Automatically removes now-unused `typing` imports
+
+**Example:**
+```python
+# Before
+from typing import Dict, List
+def foo(x: Dict[str, List[int]]) -> None:
+    pass
+
+# After
+def foo(x: dict[str, list[int]]) -> None:
+    pass
+```
+
+### return-tuple-parens-drop
+
+Removes redundant parentheses from single-line tuple return values.
+
+**What it does:**
+- Converts `return (a, b)` → `return a, b` for one-liner returns
+- Leaves multi-line tuples unchanged
+- Leaves empty tuples `return ()` and single non-tuple values `return (x)` unchanged
+
+**Example:**
+```python
+# Before
+def foo():
+    return (x, y)
+
+# After
+def foo():
+    return x, y
+```
 
 ### pydantic-v1-to-v2
 
