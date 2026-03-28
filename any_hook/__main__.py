@@ -78,6 +78,6 @@ class Main(BaseSettings):
                     contents,
                 )
             )
-            return any(
-                modifier.modify(files_data) for modifier in self.modifiers
+            return bool(
+                list(map(lambda m: m.modify(files_data), self.modifiers))
             )

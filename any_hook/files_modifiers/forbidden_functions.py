@@ -96,7 +96,7 @@ class ForbiddenFunctions(Modifier):
     )
 
     def modify(self, data: Iterable[FileData]) -> bool:
-        return any(self._check_file(file_data) for file_data in data)
+        return any(list(map(self._check_file, data)))
 
     def _check_file(self, file_data: FileData) -> bool:
         if not self.forbidden_functions:
