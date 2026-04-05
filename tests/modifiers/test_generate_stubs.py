@@ -288,7 +288,9 @@ class TestGenerateStubs(TestCase):
             )
 
             def create_stub(*_, **__):
-                (output_dir / "user.pyi").write_text(dedent("""\
+                stub_dir = output_dir / "src"
+                stub_dir.mkdir(parents=True, exist_ok=True)
+                (stub_dir / "user.pyi").write_text(dedent("""\
                     from pydantic import BaseModel
                     class User(BaseModel):
                         name: str
@@ -303,8 +305,9 @@ class TestGenerateStubs(TestCase):
     def test_returns_false_when_stub_unchanged(self):
         with TemporaryDirectory() as tmpdir:
             output_dir = Path(tmpdir)
-            stub_content = "class Foo:\n    pass\n"
-            (output_dir / "foo.pyi").write_text(stub_content)
+            stub_dir = output_dir / "src"
+            stub_dir.mkdir()
+            (stub_dir / "foo.pyi").write_text("class Foo:\n    pass\n")
             modifier = GenerateStubs(
                 directories=(Path("src"),), output_dir=output_dir
             )
@@ -315,7 +318,9 @@ class TestGenerateStubs(TestCase):
     def test_post_processes_pydantic_stub(self):
         with TemporaryDirectory() as tmpdir:
             output_dir = Path(tmpdir)
-            stub_file = output_dir / "model.pyi"
+            stub_dir = output_dir / "src"
+            stub_dir.mkdir()
+            stub_file = stub_dir / "model.pyi"
             stub_file.write_text(dedent("""\
                 from pydantic import BaseModel
                 class User(BaseModel):
@@ -334,7 +339,9 @@ class TestGenerateStubs(TestCase):
     def test_returns_true_when_stub_post_processed(self):
         with TemporaryDirectory() as tmpdir:
             output_dir = Path(tmpdir)
-            (output_dir / "model.pyi").write_text(dedent("""\
+            stub_dir = output_dir / "src"
+            stub_dir.mkdir()
+            (stub_dir / "model.pyi").write_text(dedent("""\
                 from pydantic import BaseModel
                 class User(BaseModel):
                     name: str
@@ -369,14 +376,16 @@ class TestGenerateStubs(TestCase):
     def test_cross_file_registry_used_during_post_processing(self):
         with TemporaryDirectory() as tmpdir:
             output_dir = Path(tmpdir)
-            (output_dir / "base.pyi").write_text(dedent("""\
+            stub_dir = output_dir / "src"
+            stub_dir.mkdir()
+            (stub_dir / "base.pyi").write_text(dedent("""\
                 from pydantic import BaseModel
                 class Base(BaseModel):
                     id: int
             """))
-            user_file = output_dir / "user.pyi"
+            user_file = stub_dir / "user.pyi"
             user_file.write_text(dedent("""\
-                from base import Base
+                from src.base import Base
                 class User(Base):
                     name: str
             """))
