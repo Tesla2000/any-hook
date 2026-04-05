@@ -13,6 +13,7 @@ dependencies = [
     "pydantic-settings>=2.10.1",
     "transaction>=5.0",
     "subclass-getter",
+    "autoimport>=1.6.1",
 ]
 
 [project.optional-dependencies]

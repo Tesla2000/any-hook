@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from textwrap import dedent
@@ -16,12 +17,15 @@ _MODULE = f"{GenerateStubs.__module__}.subprocess.run"
 def _transform_files(stubs: dict[str, str], target: str) -> str:
     with TemporaryDirectory() as tmpdir:
         output_dir = Path(tmpdir)
+        py_files = []
         for name, content in stubs.items():
-            f = output_dir / name
-            f.parent.mkdir(parents=True, exist_ok=True)
-            f.write_text(content)
-        stub_files = list(output_dir.rglob("*.pyi"))
-        registry = _build_registry(stub_files, output_dir)
+            stub = output_dir / name
+            stub.parent.mkdir(parents=True, exist_ok=True)
+            stub.write_text(content)
+            py = stub.with_suffix(".py")
+            py.write_text(content)
+            py_files.append(py)
+        registry = _build_registry(py_files, output_dir)
         target_file = output_dir / target
         return (
             cst.parse_module(target_file.read_text())
@@ -61,6 +65,102 @@ class TestPydanticStubTransformer(TestCase):
         """)
         self.assertIn(
             "def __init__(self, *, name: str, age: int = ...) -> None: ...",
+            _transform(code),
+        )
+
+    def test_field_without_default_treated_as_required(self):
+        code = dedent("""\
+            from pydantic import BaseModel, Field
+            class User(BaseModel):
+                name: str = Field(description="the name")
+        """)
+        self.assertIn(
+            "def __init__(self, *, name: str) -> None: ...",
+            _transform(code),
+        )
+
+    def test_field_with_default_treated_as_optional(self):
+        code = dedent("""\
+            from pydantic import BaseModel, Field
+            class User(BaseModel):
+                name: str = Field(default="anon")
+        """)
+        self.assertIn(
+            "def __init__(self, *, name: str = ...) -> None: ...",
+            _transform(code),
+        )
+
+    def test_field_with_positional_default_treated_as_optional(self):
+        code = dedent("""\
+            from pydantic import BaseModel, Field
+            class User(BaseModel):
+                name: str = Field("anon")
+        """)
+        self.assertIn(
+            "def __init__(self, *, name: str = ...) -> None: ...",
+            _transform(code),
+        )
+
+    def test_field_with_default_factory_treated_as_optional(self):
+        code = dedent("""\
+            from pydantic import BaseModel, Field
+            class User(BaseModel):
+                tags: list[str] = Field(default_factory=list)
+        """)
+        self.assertIn(
+            "def __init__(self, *, tags: list[str] = ...) -> None: ...",
+            _transform(code),
+        )
+
+    def test_field_without_default_treated_as_required_annotated(self):
+        code = dedent("""\
+            from typing import Annotated
+
+            from pydantic import BaseModel, Field
+            class User(BaseModel):
+                name: Annotated[str, Field(description="the name")]
+        """)
+        self.assertIn(
+            "def __init__(self, *, name: str) -> None: ...",
+            _transform(code),
+        )
+
+    def test_field_with_default_treated_as_optional_annotated(self):
+        code = dedent("""\
+            from typing import Annotated
+
+            from pydantic import BaseModel, Field
+            class User(BaseModel):
+                name: Annotated[str, Field(default="anon")]
+        """)
+        self.assertIn(
+            "def __init__(self, *, name: str = ...) -> None: ...",
+            _transform(code),
+        )
+
+    def test_field_with_positional_default_treated_as_optional_annotated(self):
+        code = dedent("""\
+            from typing import Annotated
+
+            from pydantic import BaseModel, Field
+            class User(BaseModel):
+                name: Annotated[str, Field("anon")]
+        """)
+        self.assertIn(
+            "def __init__(self, *, name: str = ...) -> None: ...",
+            _transform(code),
+        )
+
+    def test_field_with_default_factory_treated_as_optional_annotated(self):
+        code = dedent("""\
+            from typing import Annotated
+
+            from pydantic import BaseModel, Field
+            class User(BaseModel):
+                tags: Annotated[list[str], Field(default_factory=list)]
+        """)
+        self.assertIn(
+            "def __init__(self, *, tags: list[str] = ...) -> None: ...",
             _transform(code),
         )
 
@@ -255,7 +355,22 @@ class TestPydanticStubTransformer(TestCase):
 
 
 class TestGenerateStubs(TestCase):
+    def setUp(self) -> None:
+        self._orig_dir = os.getcwd()
+        self._src_tmpdir = TemporaryDirectory()
+        os.chdir(self._src_tmpdir.name)
+
+    def tearDown(self) -> None:
+        os.chdir(self._orig_dir)
+        self._src_tmpdir.cleanup()
+
+    def _write_source(self, rel_path: str, content: str = "pass\n") -> None:
+        p = Path(rel_path)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(content)
+
     def test_runs_stubgen_with_matched_files(self):
+        self._write_source("src/user.py")
         with patch(_MODULE) as mock_run, TemporaryDirectory() as tmpdir:
             modifier = GenerateStubs(
                 directories=(Path("src"),), output_dir=Path(tmpdir)
@@ -281,6 +396,14 @@ class TestGenerateStubs(TestCase):
         self.assertFalse(result)
 
     def test_returns_true_when_stub_created(self):
+        self._write_source(
+            "src/user.py",
+            dedent("""\
+            from pydantic import BaseModel
+            class User(BaseModel):
+                name: str
+        """),
+        )
         with TemporaryDirectory() as tmpdir:
             output_dir = Path(tmpdir)
             modifier = GenerateStubs(
@@ -303,6 +426,7 @@ class TestGenerateStubs(TestCase):
         self.assertTrue(result)
 
     def test_returns_false_when_stub_unchanged(self):
+        self._write_source("src/foo.py", "class Foo:\n    pass\n")
         with TemporaryDirectory() as tmpdir:
             output_dir = Path(tmpdir)
             stub_dir = output_dir / "src"
@@ -316,6 +440,14 @@ class TestGenerateStubs(TestCase):
         self.assertFalse(result)
 
     def test_post_processes_pydantic_stub(self):
+        self._write_source(
+            "src/model.py",
+            dedent("""\
+            from pydantic import BaseModel
+            class User(BaseModel):
+                name: str
+        """),
+        )
         with TemporaryDirectory() as tmpdir:
             output_dir = Path(tmpdir)
             stub_dir = output_dir / "src"
@@ -336,7 +468,48 @@ class TestGenerateStubs(TestCase):
         self.assertIn("def __init__(self, *, name: str) -> None: ...", result)
         self.assertNotIn("**data", result)
 
+    def test_post_processes_pydantic_stub_preserves_defaults(self):
+        self._write_source(
+            "src/model.py",
+            dedent("""\
+            from pydantic import BaseModel
+            class User(BaseModel):
+                name: str
+                age: int = 30
+        """),
+        )
+        with TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir)
+            stub_dir = output_dir / "src"
+            stub_dir.mkdir()
+            stub_file = stub_dir / "model.pyi"
+            stub_file.write_text(dedent("""\
+                from pydantic import BaseModel
+                class User(BaseModel):
+                    name: str
+                    age: int
+                    def __init__(self, **data) -> None: ...
+            """))
+            modifier = GenerateStubs(
+                directories=(Path("src"),), output_dir=output_dir
+            )
+            with patch(_MODULE):
+                modifier.modify([_make_file_data(Path("src/model.py"))])
+            result = stub_file.read_text()
+        self.assertIn(
+            "def __init__(self, *, name: str, age: int = ...) -> None: ...",
+            result,
+        )
+
     def test_returns_true_when_stub_post_processed(self):
+        self._write_source(
+            "src/model.py",
+            dedent("""\
+            from pydantic import BaseModel
+            class User(BaseModel):
+                name: str
+        """),
+        )
         with TemporaryDirectory() as tmpdir:
             output_dir = Path(tmpdir)
             stub_dir = output_dir / "src"
@@ -357,6 +530,8 @@ class TestGenerateStubs(TestCase):
         self.assertTrue(result)
 
     def test_multiple_directories_filter(self):
+        self._write_source("src/a.py")
+        self._write_source("lib/b.py")
         with patch(_MODULE) as mock_run, TemporaryDirectory() as tmpdir:
             modifier = GenerateStubs(
                 directories=(Path("src"), Path("lib")), output_dir=Path(tmpdir)
@@ -374,6 +549,22 @@ class TestGenerateStubs(TestCase):
         self.assertNotIn("tests/c.py", args)
 
     def test_cross_file_registry_used_during_post_processing(self):
+        self._write_source(
+            "src/base.py",
+            dedent("""\
+            from pydantic import BaseModel
+            class Base(BaseModel):
+                id: int
+        """),
+        )
+        self._write_source(
+            "src/user.py",
+            dedent("""\
+            from src.base import Base
+            class User(Base):
+                name: str
+        """),
+        )
         with TemporaryDirectory() as tmpdir:
             output_dir = Path(tmpdir)
             stub_dir = output_dir / "src"

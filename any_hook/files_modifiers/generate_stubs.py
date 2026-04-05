@@ -2,10 +2,13 @@ import subprocess
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Literal
+from typing import NamedTuple
 
 import libcst as cst
 from any_hook._file_data import FileData
 from any_hook.files_modifiers._base import Modifier
+from autoimport import fix_code
+from libcst import CSTTransformer
 from libcst import CSTVisitor
 from pydantic import BaseModel
 from pydantic import Field
@@ -16,16 +19,24 @@ _PYDANTIC_BASES = frozenset(
     {BaseModel.__name__, BaseSettings.__name__, RootModel.__name__}
 )
 
-_ClassKey = tuple[Path, str]
-_FieldEntry = tuple[str, cst.BaseExpression, bool]
+
+class _ClassKey(NamedTuple):
+    file: Path
+    name: str
+
+
+class _FieldEntry(NamedTuple):
+    name: str
+    annotation: cst.BaseExpression
+    has_default: bool
 
 
 class _StubCollector(CSTVisitor):
-    """First-pass visitor: collects imports, class bases, and own fields per stub file."""
+    """First-pass visitor: collects imports, class bases, and own fields per file."""
 
-    def __init__(self, stub_file: Path, output_dir: Path) -> None:
-        self._stub_file = stub_file
-        self._output_dir = output_dir
+    def __init__(self, file: Path) -> None:
+        super().__init__()
+        self._file = file
         self._class_stack: list[str] = []
         self.pydantic_imports: set[str] = set()
         self.imports: dict[str, Path | None] = {}
@@ -38,9 +49,7 @@ class _StubCollector(CSTVisitor):
         dots = len(node.relative)
         module_str = _module_to_str(node.module)
         is_pydantic = _is_pydantic_module(node.module) if dots == 0 else False
-        resolved = _resolve_import_stub(
-            self._stub_file, self._output_dir, module_str, dots
-        )
+        resolved = _resolve_import_py(self._file, module_str, dots)
         for alias in node.names:
             if not isinstance(alias.name, cst.Name):
                 continue
@@ -77,28 +86,49 @@ class _StubCollector(CSTVisitor):
         name = node.target.value
         if name.startswith("_") or _is_classvar(node.annotation):
             return False
+        annotation, has_default = _unwrap_annotated(
+            node.annotation.annotation, node.value
+        )
         self.own_fields[self._class_stack[-1]].append(
-            (name, node.annotation.annotation, node.value is not None)
+            _FieldEntry(
+                name=name, annotation=annotation, has_default=has_default
+            )
         )
         return False
 
 
+def _file_key(file: Path, output_dir: Path) -> Path:
+    return (
+        output_dir / file.with_suffix(".pyi") if file.suffix == ".py" else file
+    )
+
+
 def _build_registry(
-    stub_files: list[Path], output_dir: Path
+    files: list[Path], output_dir: Path
 ) -> dict[_ClassKey, list[_FieldEntry]]:
     """Build a registry mapping every Pydantic class to its full combined field list."""
     file_infos: dict[Path, _StubCollector] = {}
-    for stub_file in stub_files:
-        collector = _StubCollector(stub_file, output_dir)
-        cst.parse_module(stub_file.read_text()).visit(collector)
-        file_infos[stub_file] = collector
+    queue = list(files)
+    seen_files: set[Path] = set()
+    while queue:
+        file = queue.pop(0)
+        if file in seen_files or not file.exists():
+            continue
+        seen_files.add(file)
+        key = _file_key(file, output_dir)
+        collector = _StubCollector(file)
+        cst.parse_module(file.read_text()).visit(collector)
+        file_infos[key] = collector
+        for imported in collector.imports.values():
+            if imported and imported not in seen_files:
+                queue.append(imported)
 
     pydantic_keys: set[_ClassKey] = set()
     for stub_file, info in file_infos.items():
         for class_name, bases in info.class_bases.items():
             for base in bases:
                 if base in info.pydantic_imports or base in _PYDANTIC_BASES:
-                    pydantic_keys.add((stub_file, class_name))
+                    pydantic_keys.add(_ClassKey(stub_file, class_name))
                     break
 
     changed = True
@@ -106,16 +136,20 @@ def _build_registry(
         changed = False
         for stub_file, info in file_infos.items():
             for class_name, bases in info.class_bases.items():
-                key = (stub_file, class_name)
+                key = _ClassKey(stub_file, class_name)
                 if key in pydantic_keys:
                     continue
                 for base in bases:
-                    if (stub_file, base) in pydantic_keys:
+                    if _ClassKey(stub_file, base) in pydantic_keys:
                         pydantic_keys.add(key)
                         changed = True
                         break
                     source = info.imports.get(base)
-                    if source and (source, base) in pydantic_keys:
+                    if (
+                        source
+                        and _ClassKey(_file_key(source, output_dir), base)
+                        in pydantic_keys
+                    ):
                         pydantic_keys.add(key)
                         changed = True
                         break
@@ -125,7 +159,7 @@ def _build_registry(
     def resolve_fields(
         file: Path, class_name: str, seen: set[_ClassKey]
     ) -> list[_FieldEntry]:
-        key = (file, class_name)
+        key = _ClassKey(file, class_name)
         if key in registry:
             return registry[key]
         if key in seen:
@@ -136,46 +170,52 @@ def _build_registry(
             return []
         parent_fields: list[_FieldEntry] = []
         for base in info.class_bases.get(class_name, []):
-            if (file, base) in pydantic_keys:
+            if _ClassKey(file, base) in pydantic_keys:
                 parent_fields.extend(resolve_fields(file, base, seen))
             else:
                 source = info.imports.get(base)
-                if source and (source, base) in pydantic_keys:
-                    parent_fields.extend(resolve_fields(source, base, seen))
+                if source:
+                    source_key = _file_key(source, output_dir)
+                    if _ClassKey(source_key, base) in pydantic_keys:
+                        parent_fields.extend(
+                            resolve_fields(source_key, base, seen)
+                        )
         result = parent_fields + info.own_fields.get(class_name, [])
         registry[key] = result
         seen.discard(key)
         return result
 
     for key in pydantic_keys:
-        resolve_fields(*key, set())
+        resolve_fields(key.file, key.name, set())
 
     return registry
 
 
-def _resolve_import_stub(
-    current_stub: Path, output_dir: Path, module_str: str, dots: int
+def _resolve_import_py(
+    current_file: Path, module_str: str, dots: int
 ) -> Path | None:
     if dots == 0:
         if not module_str:
             return None
-        candidate = output_dir.joinpath(*module_str.split(".")).with_suffix(
-            ".pyi"
-        )
+        candidate = Path(*module_str.split(".")).with_suffix(".py")
+        if not candidate.exists():
+            candidate = current_file.parent.joinpath(
+                *module_str.split(".")
+            ).with_suffix(".py")
     else:
-        base = current_stub.parent
+        base = current_file.parent
         for _ in range(dots - 1):
             base = base.parent
         if module_str:
             candidate = base.joinpath(*module_str.split(".")).with_suffix(
-                ".pyi"
+                ".py"
             )
         else:
-            candidate = base / "__init__.pyi"
+            candidate = base / "__init__.py"
     return candidate if candidate.exists() else None
 
 
-class _PydanticStubTransformer(cst.CSTTransformer):
+class _PydanticStubTransformer(CSTTransformer):
     def __init__(
         self, stub_file: Path, registry: dict[_ClassKey, list[_FieldEntry]]
     ) -> None:
@@ -196,7 +236,7 @@ class _PydanticStubTransformer(cst.CSTTransformer):
             if self._class_stack
             else updated_node.name.value
         )
-        key = (self._stub_file, class_name)
+        key = _ClassKey(self._stub_file, class_name)
         if key not in self._registry:
             return updated_node
         if not isinstance(updated_node.body, cst.IndentedBlock):
@@ -244,6 +284,52 @@ def _build_init(fields: list[_FieldEntry]) -> cst.FunctionDef:
         returns=cst.Annotation(annotation=cst.Name("None")),
         body=cst.SimpleStatementSuite(body=[cst.Expr(value=cst.Ellipsis())]),
         leading_lines=(),
+    )
+
+
+def _unwrap_annotated(
+    annotation: cst.BaseExpression, value: cst.BaseExpression | None
+) -> tuple[cst.BaseExpression, bool]:
+    if (
+        isinstance(annotation, cst.Subscript)
+        and isinstance(annotation.value, cst.Name)
+        and annotation.value.value == "Annotated"
+        and isinstance(annotation.slice, (list, tuple))
+        and len(annotation.slice) >= 2
+    ):
+        inner = annotation.slice[0]
+        field_arg = annotation.slice[1]
+        if isinstance(inner, cst.SubscriptElement) and isinstance(
+            inner.slice, cst.Index
+        ):
+            inner_type = inner.slice.value
+        else:
+            inner_type = annotation
+        if isinstance(field_arg, cst.SubscriptElement) and isinstance(
+            field_arg.slice, cst.Index
+        ):
+            field_expr = field_arg.slice.value
+            if (
+                isinstance(field_expr, cst.Call)
+                and isinstance(field_expr.func, cst.Name)
+                and field_expr.func.value == "Field"
+            ):
+                return inner_type, _has_default(field_expr)
+        return inner_type, _has_default(value)
+    return annotation, _has_default(value)
+
+
+def _has_default(value: cst.BaseExpression | None) -> bool:
+    if value is None:
+        return False
+    if not isinstance(value, cst.Call):
+        return True
+    if not (isinstance(value.func, cst.Name) and value.func.value == "Field"):
+        return True
+    return any(
+        arg.keyword is None
+        or arg.keyword.value in ("default", "default_factory")
+        for arg in value.args
     )
 
 
@@ -324,11 +410,16 @@ class GenerateStubs(Modifier):
             return False
         before = self._snapshot_stubs()
         subprocess.run(
-            ["stubgen", "-o", str(self.output_dir), *map(str, files_to_stub)],
+            [
+                "stubgen",
+                "-o",
+                str(self.output_dir.absolute()),
+                *map(str, files_to_stub),
+            ],
             check=True,
         )
         stub_files = self._scoped_stub_files()
-        registry = _build_registry(stub_files, self.output_dir)
+        registry = _build_registry(files_to_stub, self.output_dir.absolute())
         for stub_file in stub_files:
             self._post_process_stub(stub_file, registry)
         return self._snapshot_stubs() != before
@@ -339,6 +430,7 @@ class GenerateStubs(Modifier):
         content = stub_file.read_text()
         transformer = _PydanticStubTransformer(stub_file, registry)
         new_content = cst.parse_module(content).visit(transformer).code
+        new_content = fix_code(new_content)
         if new_content == content:
             return
         stub_file.write_text(new_content)
