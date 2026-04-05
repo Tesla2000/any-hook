@@ -92,3 +92,7 @@ class Main(BaseSettings):
                 else self.modifiers
             )
             return any(list(map(lambda m: m.modify(files_data), modifiers)))
+
+
+if __name__ == "__main__":
+    Main().cli_cmd()
