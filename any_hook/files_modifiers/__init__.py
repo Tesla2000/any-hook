@@ -5,6 +5,7 @@ from any_hook.files_modifiers._base import Modifier
 from any_hook.files_modifiers.agito import Agito
 from any_hook.files_modifiers.field_validator_check import FieldValidatorCheck
 from any_hook.files_modifiers.forbidden_functions import ForbiddenFunctions
+from any_hook.files_modifiers.git_add import GitAdd
 from any_hook.files_modifiers.len_as_bool import LenAsBool
 from any_hook.files_modifiers.local_imports import LocalImports
 from any_hook.files_modifiers.object_to_any import ObjectToAny
@@ -33,6 +34,7 @@ AnyModifier = Annotated[
         LenAsBool,
         TypingToBuiltin,
         ReturnTupleParensDrop,
+        GitAdd,
         Agito,
     ],
     Field(discriminator="type"),
@@ -51,6 +53,7 @@ __all__ = [
     "LenAsBool",
     "TypingToBuiltin",
     "ReturnTupleParensDrop",
+    "GitAdd",
     "AnyModifier",
 ]
 try:
@@ -66,5 +69,17 @@ except ImportError as e:
     print(
         f"Package necessary to use workflow-env-to-example is not installed, "
         f"workflow-env-to-example is disabled.\n{e}"
+    )
+try:
+    from any_hook.files_modifiers.generate_stubs import GenerateStubs
+
+    AnyModifier = Annotated[
+        Union[AnyModifier, GenerateStubs], Field(discriminator="type")
+    ]
+    __all__.append("GenerateStubs")
+except ImportError as e:
+    print(
+        f"Package necessary to use generate-stubs is not installed, "
+        f"generate-stubs is disabled.\n{e}"
     )
 Agito.model_rebuild(_types_namespace={"AnyModifier": AnyModifier})
