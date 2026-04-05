@@ -310,8 +310,8 @@ class GenerateStubs(Modifier):
         description="Source directories; only FileData paths under these are stubbed.",
     )
     output_dir: Path = Field(
-        default=Path("out"),
-        description="Output directory for generated stub files.",
+        default=Path("."),
+        description="Output directory for generated stub files. Stub discovery is scoped to output_dir/directory for each configured directory, so '.' is safe as a default.",
     )
 
     def modify(self, data: Iterable[FileData]) -> bool:
@@ -327,7 +327,7 @@ class GenerateStubs(Modifier):
             ["stubgen", "-o", str(self.output_dir), *map(str, files_to_stub)],
             check=True,
         )
-        stub_files = list(self.output_dir.rglob("*.pyi"))
+        stub_files = self._scoped_stub_files()
         registry = _build_registry(stub_files, self.output_dir)
         for stub_file in stub_files:
             self._post_process_stub(stub_file, registry)
@@ -344,7 +344,13 @@ class GenerateStubs(Modifier):
         stub_file.write_text(new_content)
         self._output(f"Stub {stub_file} was post-processed")
 
+    def _scoped_stub_files(self) -> list[Path]:
+        result: list[Path] = []
+        for d in self.directories:
+            scan_path = self.output_dir / d
+            if scan_path.exists():
+                result.extend(scan_path.rglob("*.pyi"))
+        return result
+
     def _snapshot_stubs(self) -> dict[Path, str]:
-        if not self.output_dir.exists():
-            return {}
-        return {f: f.read_text() for f in self.output_dir.rglob("*.pyi")}
+        return {f: f.read_text() for f in self._scoped_stub_files()}
