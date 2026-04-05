@@ -32,6 +32,12 @@ For the workflow-env-to-example modifier, install with the optional dependency:
 pip install any-hook[workflow-env-to-example]
 ```
 
+For the generate-stubs modifier, install with the optional dependency:
+
+```bash
+pip install any-hook[generate-stubs]
+```
+
 ## Available Modifiers
 
 All modifiers share the following common options:
@@ -134,17 +140,20 @@ class Status(StrEnum):
 
 ### pydantic-config-to-model-config
 
-Migrates Pydantic v1 nested `Config` classes to v2 `model_config = ConfigDict(...)`.
+Migrates Pydantic v1 config patterns to v2 `model_config: ClassVar[ConfigDict] = ConfigDict(...)`.
 
 **What it does:**
 - Converts inner `Config` classes to `model_config` assignments using `ConfigDict`
-- Automatically adds `ConfigDict` import if not present
-- Skips classes that already have `model_config` defined
+- Converts inline class keyword arguments (`class Foo(BaseModel, frozen=True)`) to `model_config`
+- When both a `Config` class and inline kwargs are present, merges them into a single `ConfigDict` call
+- When inline kwargs exist alongside an existing `model_config`, merges non-conflicting keys into the existing `ConfigDict`; raises an error if the same key is defined in both places
+- Adds `ClassVar[ConfigDict]` type annotation to created or upgraded `model_config` assignments; preserves existing annotations
+- Automatically adds `ConfigDict` and `ClassVar` imports if not present
 
 **Options:**
 - `config_class_name` (default: `"Config"`) — name of the nested config class to convert
 
-**Example:**
+**Example — nested Config class:**
 ```python
 # Before
 from pydantic import BaseModel
@@ -155,10 +164,103 @@ class User(BaseModel):
         extra = "forbid"
 
 # After
+from typing import ClassVar
 from pydantic import BaseModel, ConfigDict
 class User(BaseModel):
     name: str
-    model_config = ConfigDict(frozen=True, extra="forbid")
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="forbid")
+```
+
+**Example — inline class kwargs:**
+```python
+# Before
+from pydantic import BaseModel
+class User(BaseModel, frozen=True):
+    name: str
+
+# After
+from typing import ClassVar
+from pydantic import BaseModel, ConfigDict
+class User(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+    name: str
+```
+
+### git-add
+
+Stages files in specified directories with `git add` and signals the hook to re-run if anything was newly staged.
+
+**What it does:**
+- Snapshots the git index state before and after running `git add`
+- Returns exit code 1 if any files were staged (prompting the user to re-inspect the commit), 0 otherwise
+- Useful for auto-staging generated or reformatted files as part of a hook pipeline
+
+**Options:**
+- `directories` (required) — tuple of directory paths to pass to `git add`
+
+**Example:**
+```json
+{"type": "git-add", "directories": ["src/generated", "docs"]}
+```
+
+**Configuration:**
+```yaml
+- repo: local
+  hooks:
+    - id: any-hook
+      args:
+        - --modifiers
+        - '[{"type": "git-add", "directories": ["src/generated"]}]'
+```
+
+### generate-stubs
+
+Generates type stub (`.pyi`) files for specified directories and post-processes them to produce accurate Pydantic model constructors.
+
+**What it does:**
+- Runs `stubgen` (from mypy) on the configured directories, writing stubs to `output_dir` (default: `out/`)
+- Post-processes each generated stub to replace the generic `**data: Any` constructor on Pydantic models with a precise keyword-only `__init__` signature derived from the class fields
+- Excludes `ClassVar` fields and private fields (names starting with `_`) from the generated `__init__`
+- Detects Pydantic models by import (`BaseModel`, `BaseSettings`, `RootModel` from `pydantic` or `pydantic.v1`) and by inheritance from already-detected model classes
+- Returns exit code 1 if any stub files were created or modified (prompting the user to stage and re-commit)
+
+**Requirements:**
+- mypy (install with `pip install any-hook[generate-stubs]`)
+
+**Options:**
+- `directories` (required) — source directories to pass to `stubgen`
+- `output_dir` (default: `"out"`) — directory where stubs are written
+
+**Example — source model:**
+```python
+from pydantic import BaseModel
+
+class User(BaseModel):
+    name: str
+    age: int = 30
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+    _cache: str  # private field
+```
+
+**Generated stub (after post-processing):**
+```python
+class User(BaseModel):
+    name: str
+    age: int = ...
+    model_config: ClassVar[ConfigDict]
+    _cache: str
+    def __init__(self, *, name: str, age: int = ...) -> None: ...
+```
+
+**Configuration:**
+```yaml
+- repo: local
+  hooks:
+    - id: any-hook
+      args:
+        - --modifiers
+        - '[{"type": "generate-stubs", "directories": ["src"], "output_dir": "stubs"}]'
+      pass_filenames: false
 ```
 
 ### forbidden-functions

@@ -56,12 +56,12 @@ repos:
             ".venv,venv,tests/base.py,docs/conf.py",
             "--ignore-attributes-for-classes=.*",
             "--ignore-decorators=@app.*,@pytest.fixture,@property,@model_validator,@field_serializer,@field_validator",
-            "--ignore-names=Meta,__dict__,cli_cmd,annotation,ExternalModifier",
+            "--ignore-names=Meta,__dict__,cli_cmd,annotation,ExternalModifier,side_effect,return_value,visit_ClassDef,leave_ClassDef",
              "--extra-sys-path=.venv/lib/python3.12/site-packages,.",
           ]
         stages: [ pre-commit ]
   - repo: https://github.com/Tesla2000/any-hook
-    rev: v1.0.7
+    rev: v2.0.4
     hooks:
       - id: any-hook
         args: [--modifiers, '[{"type":"object-to-any"},{"type":"pydantic-config-to-model-config"},{"type":"local-imports"},{"type":"pydantic-v1-to-v2"},{"type":"str-enum-inheritance"},{"type":"forbidden-functions","forbidden_functions":["hasattr","getattr"]},{"type":"forbidden-functions","forbidden_functions":["print"],"excluded_paths":["any_hook/files_modifiers/output/stdout.py","any_hook/_transaction.py","any_hook/files_modifiers/__init__.py","any_hook/files_modifiers/__init__.py"]},{"type":"utcnow-to-datetime-now"},{"type":"len-as-bool"},{"type":"typing-to-builtin"}]']
