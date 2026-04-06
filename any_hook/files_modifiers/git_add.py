@@ -41,7 +41,7 @@ class GitAdd(Modifier):
         before = self._get_porcelain_status()
         subprocess.run(
             ["git", "add", "--", *self.directories],
-            check=True,
+            check=False,
         )
         return self._get_porcelain_status() != before
 

@@ -38,7 +38,7 @@ class TestGitAdd(TestCase):
             modifier.modify([])
         add_call = mock_run.call_args_list[1]
         self.assertEqual(
-            add_call, call(["git", "add", "--", "src", "docs"], check=True)
+            add_call, call(["git", "add", "--", "src", "docs"], check=False)
         )
 
     def test_calls_git_status_for_each_directory_set(self):
