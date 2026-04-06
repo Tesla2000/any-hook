@@ -6,6 +6,7 @@ repos:
 #       stages: [pre-push]
   - repo: https://github.com/psf/black
     rev: 26.3.1
+    exclude: \.pyi$
     hooks:
       - id: black
         args: ["--preview", "--line-length", "79"]
@@ -16,6 +17,7 @@ repos:
 #       stages: [pre-push]
   - repo: https://github.com/Tesla2000/temp-reorder-python-imports
     rev: v0.0.1
+    exclude: \.pyi$
     hooks:
       - id: reorder-python-imports
         args: [
@@ -28,6 +30,7 @@ repos:
         ]
   - repo: https://github.com/PyCQA/autoflake
     rev: v2.3.3
+    exclude: \.pyi$
     hooks:
       - id: autoflake
         args: [ --remove-all-unused-imports, --in-place ]
@@ -42,11 +45,13 @@ repos:
 #      - id: import_rules_enforcer
   - repo: https://github.com/pycqa/flake8
     rev: '7.3.0'
+    exclude: \.pyi$
     hooks:
       - id: flake8
         args: [ "--ignore=E203,W503,E501,E704" ]
   - repo: https://github.com/Tesla2000/vulture
     rev: v0.0.3
+    exclude: \.pyi$
     hooks:
       - id: vulture
         args:
