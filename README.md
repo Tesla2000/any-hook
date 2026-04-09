@@ -186,21 +186,21 @@ class User(BaseModel):
     name: str
 ```
 
-### git-add
+### check-untracked
 
-Stages files in specified directories with `git add` and signals the hook to re-run if anything was newly staged.
+Checks for untracked files in specified directories and signals the hook to fail if any are found.
 
 **What it does:**
-- Snapshots the git index state before and after running `git add`
-- Returns exit code 1 if any files were staged (prompting the user to re-inspect the commit), 0 otherwise
-- Useful for auto-staging generated or reformatted files as part of a hook pipeline
+- Scans the git index for untracked (`??`) files under the configured directories
+- Returns exit code 1 if any untracked files are found (prompting the user to explicitly stage them), 0 otherwise
+- Does not stage any files — leaves the decision to the developer
 
 **Options:**
-- `directories` (required) — tuple of directory paths to pass to `git add`
+- `directories` (required) — tuple of directory paths to check for untracked files
 
 **Example:**
 ```json
-{"type": "git-add", "directories": ["src/generated", "docs"]}
+{"type": "check-untracked", "directories": ["src/generated", "docs"]}
 ```
 
 **Configuration:**
@@ -210,7 +210,7 @@ Stages files in specified directories with `git add` and signals the hook to re-
     - id: any-hook
       args:
         - --modifiers
-        - '[{"type": "git-add", "directories": ["src/generated"]}]'
+        - '[{"type": "check-untracked", "directories": ["src/generated"]}]'
 ```
 
 ### generate-stubs
