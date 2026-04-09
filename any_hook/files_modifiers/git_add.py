@@ -38,21 +38,22 @@ class GitAdd(Modifier):
     )
 
     def modify(self, data: Iterable[FileData]) -> bool:
-        before = self._get_porcelain_status()
-        subprocess.run(
-            ["git", "add", "--", *self.directories],
-            check=False,
-        )
-        after = self._get_porcelain_status()
-        if after == before:
+        untracked = self._untracked_files()
+        if not untracked:
             return False
-        self._output(f"git add staged changes:\n{after}")
+        subprocess.run(["git", "add", "--", *untracked], check=False)
+        self._output("git add staged new files:\n" + "\n".join(untracked))
         return True
 
-    def _get_porcelain_status(self) -> str:
-        return subprocess.run(
+    def _untracked_files(self) -> list[str]:
+        result = subprocess.run(
             ["git", "status", "--porcelain", "-z", "--", *self.directories],
             capture_output=True,
             text=True,
             check=True,
         ).stdout
+        return [
+            entry[3:]
+            for entry in result.split("\0")
+            if entry.startswith("?? ")
+        ]
