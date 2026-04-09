@@ -43,7 +43,11 @@ class GitAdd(Modifier):
             ["git", "add", "--", *self.directories],
             check=False,
         )
-        return self._get_porcelain_status() != before
+        after = self._get_porcelain_status()
+        if after == before:
+            return False
+        self._output(f"git add staged changes:\n{after}")
+        return True
 
     def _get_porcelain_status(self) -> str:
         return subprocess.run(
