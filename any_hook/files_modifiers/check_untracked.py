@@ -36,15 +36,28 @@ class CheckUntracked(Modifier):
             self._output("Untracked files found:\n" + "\n".join(untracked))
         return bool(untracked)
 
-    def _untracked_files(self) -> list[str]:
-        result = subprocess.run(
-            ["git", "status", "--porcelain", "-z", "--", *self.directories],
+    def _git_root(self) -> str:
+        return subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
             capture_output=True,
             text=True,
             check=True,
+        ).stdout.strip()
+
+    def _untracked_files(self) -> list[str]:
+        result = subprocess.run(
+            [
+                "git",
+                "ls-files",
+                "--others",
+                "--exclude-standard",
+                "-z",
+                "--",
+                *self.directories,
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=self._git_root(),
         ).stdout
-        return [
-            entry[3:]
-            for entry in result.split("\0")
-            if entry.startswith("?? ")
-        ]
+        return [f for f in result.split("\0") if f]
