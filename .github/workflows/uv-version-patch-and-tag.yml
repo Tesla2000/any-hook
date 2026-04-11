@@ -8,13 +8,13 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
-    types: [closed]
+    types: [opened, synchronize, reopened, closed]
 
 jobs:
   bump_and_tag:
     runs-on: ubuntu-latest
     if: github.event_name == 'push' ||
-        (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+        github.event_name == 'pull_request'
 
     steps:
       - uses: actions/checkout@v4
@@ -24,14 +24,42 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v4
 
+      - name: Determine bump type
+        id: bump_type
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "bump=patch" >> $GITHUB_OUTPUT
+          else
+            echo "bump=minor" >> $GITHUB_OUTPUT
+          fi
+
       - id: tag_version
         uses: mathieudutour/github-tag-action@v6.2
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          default_bump: patch
+          default_bump: ${{ steps.bump_type.outputs.bump }}
           release_branches: main
+          dry_run: ${{ github.event_name == 'pull_request' }}
+
+      - name: Create alpha tag for PR
+        if: github.event_name == 'pull_request'
+        run: |
+          BASE_TAG=${{ steps.tag_version.outputs.new_tag }}
+          EXISTING=$(git tag --list "${BASE_TAG}-alpha.*" | sort -V | tail -1)
+          if [ -z "$EXISTING" ]; then
+            ALPHA_NUM=1
+          else
+            ALPHA_NUM=$(echo "$EXISTING" | grep -oP '\d+$')
+            ALPHA_NUM=$((ALPHA_NUM + 1))
+          fi
+          ALPHA_TAG="${BASE_TAG}-alpha.${ALPHA_NUM}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "$ALPHA_TAG"
+          git push origin "$ALPHA_TAG"
 
       - name: Sync pyproject.toml version to tag
+        if: github.event_name == 'push'
         run: |
           NEW_VERSION=${{ steps.tag_version.outputs.new_version }}
           CURRENT_VERSION=$(grep -oP '^version = "\K[^"]+' pyproject.toml)
@@ -39,9 +67,10 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add pyproject.toml
-          git commit -m "bump: patch version"
+          git commit -m "bump: minor version"
 
       - name: Create GitHub Release
+        if: github.event_name == 'push'
         uses: ncipollo/release-action@v1
         with:
           tag: ${{ steps.tag_version.outputs.new_tag }}
@@ -49,4 +78,5 @@ jobs:
           body: ${{ steps.tag_version.outputs.changelog }}
 
       - name: Push bump commit
+        if: github.event_name == 'push'
         run: git push origin main
