@@ -62,7 +62,13 @@ class Agito(Modifier):
     modifiers: Annotated[tuple["AnyModifier", ...], Field(min_length=1)]
 
     def modify(self, data: Iterable[FileData]) -> bool:
-        return any(list(map(self._modify_file, data)))
+        all_files = list(data)
+        global_changed = any(
+            m.modify(iter(all_files))
+            for m in self.modifiers
+            if not isinstance(m, SeparateModifier)
+        )
+        return any(list(map(self._modify_file, all_files))) or global_changed
 
     def _modify_file(self, file_data: FileData) -> bool:
         if not self.should_process_file(file_data.path):
@@ -74,16 +80,11 @@ class Agito(Modifier):
             if isinstance(m, SeparateModifier)
             and m.should_process_file(file_data.path)
         )
-        changed = False
-        if transformers:
-            new_code = file_data.module.visit(
-                _AgitoTransformer(transformers)
-            ).code
-            if new_code != file_data.content:
-                file_data.path.write_text(new_code)
-                self._output(f"File {file_data.path} was modified")
-                changed = True
-        for m in self.modifiers:
-            if not isinstance(m, SeparateModifier) and m.modify([file_data]):
-                changed = True
-        return changed
+        if not transformers:
+            return False
+        new_code = file_data.module.visit(_AgitoTransformer(transformers)).code
+        if new_code == file_data.content:
+            return False
+        file_data.path.write_text(new_code)
+        self._output(f"File {file_data.path} was modified")
+        return True
