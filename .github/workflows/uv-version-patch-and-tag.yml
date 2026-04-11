@@ -41,13 +41,22 @@ jobs:
           release_branches: main
           dry_run: ${{ github.event_name == 'pull_request' }}
 
-      - name: Create beta tag for PR
+      - name: Create alpha tag for PR
         if: github.event_name == 'pull_request'
         run: |
+          BASE_TAG=${{ steps.tag_version.outputs.new_tag }}
+          EXISTING=$(git tag --list "${BASE_TAG}-alpha.*" | sort -V | tail -1)
+          if [ -z "$EXISTING" ]; then
+            ALPHA_NUM=1
+          else
+            ALPHA_NUM=$(echo "$EXISTING" | grep -oP '\d+$')
+            ALPHA_NUM=$((ALPHA_NUM + 1))
+          fi
+          ALPHA_TAG="${BASE_TAG}-alpha.${ALPHA_NUM}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -f ${{ steps.tag_version.outputs.new_tag }}-beta
-          git push origin -f ${{ steps.tag_version.outputs.new_tag }}-beta
+          git tag "$ALPHA_TAG"
+          git push origin "$ALPHA_TAG"
 
       - name: Sync pyproject.toml version to tag
         if: github.event_name == 'push'
