@@ -2,10 +2,10 @@ import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from textwrap import dedent
-from unittest import TestCase
 from unittest.mock import patch
 
 import libcst as cst
+import pytest
 from any_hook._file_data import FileData
 from any_hook.files_modifiers.generate_stubs import _build_registry
 from any_hook.files_modifiers.generate_stubs import _PydanticStubTransformer
@@ -45,15 +45,15 @@ def _make_file_data(path: Path) -> FileData:
     )
 
 
-class TestPydanticStubTransformer(TestCase):
+class TestPydanticStubTransformer:
     def test_generates_init_for_required_field(self):
         code = dedent("""\
             from pydantic import BaseModel
             class User(BaseModel):
                 name: str
         """)
-        self.assertIn(
-            "def __init__(self, *, name: str) -> None: ...", _transform(code)
+        assert "def __init__(self, *, name: str) -> None: ..." in _transform(
+            code
         )
 
     def test_generates_init_with_default(self):
@@ -63,9 +63,9 @@ class TestPydanticStubTransformer(TestCase):
                 name: str
                 age: int = ...
         """)
-        self.assertIn(
-            "def __init__(self, *, name: str, age: int = ...) -> None: ...",
-            _transform(code),
+        assert (
+            "def __init__(self, *, name: str, age: int = ...) -> None: ..."
+            in _transform(code)
         )
 
     def test_field_without_default_treated_as_required(self):
@@ -74,9 +74,8 @@ class TestPydanticStubTransformer(TestCase):
             class User(BaseModel):
                 name: str = Field(description="the name")
         """)
-        self.assertIn(
-            "def __init__(self, *, name: str) -> None: ...",
-            _transform(code),
+        assert "def __init__(self, *, name: str) -> None: ..." in _transform(
+            code
         )
 
     def test_field_with_default_treated_as_optional(self):
@@ -85,9 +84,9 @@ class TestPydanticStubTransformer(TestCase):
             class User(BaseModel):
                 name: str = Field(default="anon")
         """)
-        self.assertIn(
-            "def __init__(self, *, name: str = ...) -> None: ...",
-            _transform(code),
+        assert (
+            "def __init__(self, *, name: str = ...) -> None: ..."
+            in _transform(code)
         )
 
     def test_field_with_positional_default_treated_as_optional(self):
@@ -96,9 +95,9 @@ class TestPydanticStubTransformer(TestCase):
             class User(BaseModel):
                 name: str = Field("anon")
         """)
-        self.assertIn(
-            "def __init__(self, *, name: str = ...) -> None: ...",
-            _transform(code),
+        assert (
+            "def __init__(self, *, name: str = ...) -> None: ..."
+            in _transform(code)
         )
 
     def test_field_with_default_factory_treated_as_optional(self):
@@ -107,9 +106,9 @@ class TestPydanticStubTransformer(TestCase):
             class User(BaseModel):
                 tags: list[str] = Field(default_factory=list)
         """)
-        self.assertIn(
-            "def __init__(self, *, tags: list[str] = ...) -> None: ...",
-            _transform(code),
+        assert (
+            "def __init__(self, *, tags: list[str] = ...) -> None: ..."
+            in _transform(code)
         )
 
     def test_field_without_default_treated_as_required_annotated(self):
@@ -120,9 +119,8 @@ class TestPydanticStubTransformer(TestCase):
             class User(BaseModel):
                 name: Annotated[str, Field(description="the name")]
         """)
-        self.assertIn(
-            "def __init__(self, *, name: str) -> None: ...",
-            _transform(code),
+        assert "def __init__(self, *, name: str) -> None: ..." in _transform(
+            code
         )
 
     def test_field_with_default_treated_as_optional_annotated(self):
@@ -133,9 +131,9 @@ class TestPydanticStubTransformer(TestCase):
             class User(BaseModel):
                 name: Annotated[str, Field(default="anon")]
         """)
-        self.assertIn(
-            "def __init__(self, *, name: str = ...) -> None: ...",
-            _transform(code),
+        assert (
+            "def __init__(self, *, name: str = ...) -> None: ..."
+            in _transform(code)
         )
 
     def test_field_with_positional_default_treated_as_optional_annotated(self):
@@ -146,9 +144,9 @@ class TestPydanticStubTransformer(TestCase):
             class User(BaseModel):
                 name: Annotated[str, Field("anon")]
         """)
-        self.assertIn(
-            "def __init__(self, *, name: str = ...) -> None: ...",
-            _transform(code),
+        assert (
+            "def __init__(self, *, name: str = ...) -> None: ..."
+            in _transform(code)
         )
 
     def test_field_with_default_factory_treated_as_optional_annotated(self):
@@ -159,9 +157,9 @@ class TestPydanticStubTransformer(TestCase):
             class User(BaseModel):
                 tags: Annotated[list[str], Field(default_factory=list)]
         """)
-        self.assertIn(
-            "def __init__(self, *, tags: list[str] = ...) -> None: ...",
-            _transform(code),
+        assert (
+            "def __init__(self, *, tags: list[str] = ...) -> None: ..."
+            in _transform(code)
         )
 
     def test_excludes_classvar_from_init(self):
@@ -173,8 +171,8 @@ class TestPydanticStubTransformer(TestCase):
                 name: str
         """)
         result = _transform(code)
-        self.assertIn("def __init__(self, *, name: str) -> None: ...", result)
-        self.assertNotIn("model_config", result.split("def __init__")[1])
+        assert "def __init__(self, *, name: str) -> None: ..." in result
+        assert "model_config" not in result.split("def __init__")[1]
 
     def test_excludes_private_fields_from_init(self):
         code = dedent("""\
@@ -184,8 +182,8 @@ class TestPydanticStubTransformer(TestCase):
                 _private: str
         """)
         result = _transform(code)
-        self.assertIn("def __init__(self, *, name: str) -> None: ...", result)
-        self.assertNotIn("_private", result.split("def __init__")[1])
+        assert "def __init__(self, *, name: str) -> None: ..." in result
+        assert "_private" not in result.split("def __init__")[1]
 
     def test_replaces_existing_generic_init(self):
         code = dedent("""\
@@ -196,15 +194,15 @@ class TestPydanticStubTransformer(TestCase):
                 def __init__(self, **data: Any) -> None: ...
         """)
         result = _transform(code)
-        self.assertIn("def __init__(self, *, name: str) -> None: ...", result)
-        self.assertNotIn("**data", result)
+        assert "def __init__(self, *, name: str) -> None: ..." in result
+        assert "**data" not in result
 
     def test_non_pydantic_class_unchanged(self):
         code = dedent("""\
             class Foo:
                 name: str
         """)
-        self.assertNotIn("def __init__", _transform(code))
+        assert "def __init__" not in _transform(code)
 
     def test_same_file_inherited_class_includes_parent_fields(self):
         code = dedent("""\
@@ -215,9 +213,9 @@ class TestPydanticStubTransformer(TestCase):
                 name: str
         """)
         result = _transform(code)
-        self.assertIn("def __init__(self, *, id: int) -> None: ...", result)
-        self.assertIn(
-            "def __init__(self, *, id: int, name: str) -> None: ...", result
+        assert "def __init__(self, *, id: int) -> None: ..." in result
+        assert (
+            "def __init__(self, *, id: int, name: str) -> None: ..." in result
         )
 
     def test_same_file_deep_inheritance_accumulates_all_ancestor_fields(self):
@@ -231,13 +229,11 @@ class TestPydanticStubTransformer(TestCase):
                 c: float
         """)
         result = _transform(code)
-        self.assertIn("def __init__(self, *, a: int) -> None: ...", result)
-        self.assertIn(
-            "def __init__(self, *, a: int, b: str) -> None: ...", result
-        )
-        self.assertIn(
-            "def __init__(self, *, a: int, b: str, c: float) -> None: ...",
-            result,
+        assert "def __init__(self, *, a: int) -> None: ..." in result
+        assert "def __init__(self, *, a: int, b: str) -> None: ..." in result
+        assert (
+            "def __init__(self, *, a: int, b: str, c: float) -> None: ..."
+            in result
         )
 
     def test_cross_file_parent_fields_included(self):
@@ -254,8 +250,8 @@ class TestPydanticStubTransformer(TestCase):
         result = _transform_files(
             {"base.pyi": base_stub, "user.pyi": user_stub}, "user.pyi"
         )
-        self.assertIn(
-            "def __init__(self, *, id: int, name: str) -> None: ...", result
+        assert (
+            "def __init__(self, *, id: int, name: str) -> None: ..." in result
         )
 
     def test_cross_file_relative_import_resolved(self):
@@ -273,8 +269,8 @@ class TestPydanticStubTransformer(TestCase):
             {"pkg/base.pyi": base_stub, "pkg/user.pyi": user_stub},
             "pkg/user.pyi",
         )
-        self.assertIn(
-            "def __init__(self, *, id: int, name: str) -> None: ...", result
+        assert (
+            "def __init__(self, *, id: int, name: str) -> None: ..." in result
         )
 
     def test_cross_file_multi_level_inheritance(self):
@@ -296,9 +292,9 @@ class TestPydanticStubTransformer(TestCase):
         result = _transform_files(
             {"a.pyi": a_stub, "b.pyi": b_stub, "c.pyi": c_stub}, "c.pyi"
         )
-        self.assertIn(
-            "def __init__(self, *, a: int, b: str, c: float) -> None: ...",
-            result,
+        assert (
+            "def __init__(self, *, a: int, b: str, c: float) -> None: ..."
+            in result
         )
 
     def test_empty_pydantic_model_gets_no_kwonly(self):
@@ -308,8 +304,8 @@ class TestPydanticStubTransformer(TestCase):
                 pass
         """)
         result = _transform(code)
-        self.assertIn("def __init__(self) -> None: ...", result)
-        self.assertNotIn("*,", result)
+        assert "def __init__(self) -> None: ..." in result
+        assert "*," not in result
 
     def test_base_settings_detected_as_pydantic(self):
         code = dedent("""\
@@ -317,8 +313,8 @@ class TestPydanticStubTransformer(TestCase):
             class Config(BaseSettings):
                 host: str
         """)
-        self.assertIn(
-            "def __init__(self, *, host: str) -> None: ...", _transform(code)
+        assert "def __init__(self, *, host: str) -> None: ..." in _transform(
+            code
         )
 
     def test_complex_annotation_preserved(self):
@@ -328,9 +324,9 @@ class TestPydanticStubTransformer(TestCase):
             class User(BaseModel):
                 name: Optional[str]
         """)
-        self.assertIn(
-            "def __init__(self, *, name: Optional[str]) -> None: ...",
-            _transform(code),
+        assert (
+            "def __init__(self, *, name: Optional[str]) -> None: ..."
+            in _transform(code)
         )
 
     def test_pydantic_v1_compat_import_detected(self):
@@ -339,8 +335,8 @@ class TestPydanticStubTransformer(TestCase):
             class User(BaseModel):
                 name: str
         """)
-        self.assertIn(
-            "def __init__(self, *, name: str) -> None: ...", _transform(code)
+        assert "def __init__(self, *, name: str) -> None: ..." in _transform(
+            code
         )
 
     def test_aliased_import_detected(self):
@@ -349,20 +345,19 @@ class TestPydanticStubTransformer(TestCase):
             class User(PydModel):
                 name: str
         """)
-        self.assertIn(
-            "def __init__(self, *, name: str) -> None: ...", _transform(code)
+        assert "def __init__(self, *, name: str) -> None: ..." in _transform(
+            code
         )
 
 
-class TestGenerateStubs(TestCase):
-    def setUp(self) -> None:
-        self._orig_dir = os.getcwd()
-        self._src_tmpdir = TemporaryDirectory()
-        os.chdir(self._src_tmpdir.name)
-
-    def tearDown(self) -> None:
-        os.chdir(self._orig_dir)
-        self._src_tmpdir.cleanup()
+class TestGenerateStubs:
+    @pytest.fixture(autouse=True)
+    def _chdir_to_tmpdir(self):
+        orig_dir = os.getcwd()
+        with TemporaryDirectory() as tmpdir:
+            os.chdir(tmpdir)
+            yield
+        os.chdir(orig_dir)
 
     def _write_source(self, rel_path: str, content: str = "pass\n") -> None:
         p = Path(rel_path)
@@ -386,14 +381,14 @@ class TestGenerateStubs(TestCase):
             modifier = GenerateStubs(directories=(Path("src"),))
             result = modifier.modify([_make_file_data(Path("other/user.py"))])
         mock_run.assert_not_called()
-        self.assertFalse(result)
+        assert not result
 
     def test_returns_false_when_no_matching_files(self):
         modifier = GenerateStubs(directories=(Path("src"),))
         with patch(_MODULE) as mock_run:
             result = modifier.modify([])
         mock_run.assert_not_called()
-        self.assertFalse(result)
+        assert not result
 
     def test_returns_true_when_stub_created(self):
         self._write_source(
@@ -423,7 +418,7 @@ class TestGenerateStubs(TestCase):
                 result = modifier.modify(
                     [_make_file_data(Path("src/user.py"))]
                 )
-        self.assertTrue(result)
+        assert result
 
     def test_returns_false_when_stub_unchanged(self):
         self._write_source("src/foo.py", "class Foo:\n    pass\n")
@@ -437,7 +432,7 @@ class TestGenerateStubs(TestCase):
             )
             with patch(_MODULE):
                 result = modifier.modify([_make_file_data(Path("src/foo.py"))])
-        self.assertFalse(result)
+        assert not result
 
     def test_post_processes_pydantic_stub(self):
         self._write_source(
@@ -465,8 +460,8 @@ class TestGenerateStubs(TestCase):
             with patch(_MODULE):
                 modifier.modify([_make_file_data(Path("src/model.py"))])
             result = stub_file.read_text()
-        self.assertIn("def __init__(self, *, name: str) -> None: ...", result)
-        self.assertNotIn("**data", result)
+        assert "def __init__(self, *, name: str) -> None: ..." in result
+        assert "**data" not in result
 
     def test_post_processes_pydantic_stub_preserves_defaults(self):
         self._write_source(
@@ -496,9 +491,9 @@ class TestGenerateStubs(TestCase):
             with patch(_MODULE):
                 modifier.modify([_make_file_data(Path("src/model.py"))])
             result = stub_file.read_text()
-        self.assertIn(
-            "def __init__(self, *, name: str, age: int = ...) -> None: ...",
-            result,
+        assert (
+            "def __init__(self, *, name: str, age: int = ...) -> None: ..."
+            in result
         )
 
     def test_returns_true_when_stub_post_processed(self):
@@ -527,7 +522,7 @@ class TestGenerateStubs(TestCase):
                 result = modifier.modify(
                     [_make_file_data(Path("src/model.py"))]
                 )
-        self.assertTrue(result)
+        assert result
 
     def test_multiple_directories_filter(self):
         self._write_source("src/a.py")
@@ -544,9 +539,9 @@ class TestGenerateStubs(TestCase):
                 ]
             )
         args = mock_run.call_args[0][0]
-        self.assertIn("src/a.py", args)
-        self.assertIn("lib/b.py", args)
-        self.assertNotIn("tests/c.py", args)
+        assert "src/a.py" in args
+        assert "lib/b.py" in args
+        assert "tests/c.py" not in args
 
     def test_cross_file_registry_used_during_post_processing(self):
         self._write_source(
@@ -586,6 +581,6 @@ class TestGenerateStubs(TestCase):
             with patch(_MODULE):
                 modifier.modify([_make_file_data(Path("src/user.py"))])
             result = user_file.read_text()
-        self.assertIn(
-            "def __init__(self, *, id: int, name: str) -> None: ...", result
+        assert (
+            "def __init__(self, *, id: int, name: str) -> None: ..." in result
         )

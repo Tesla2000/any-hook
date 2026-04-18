@@ -1,5 +1,4 @@
 from pathlib import Path
-from unittest import TestCase
 from unittest.mock import patch
 
 from any_hook._file_data import FileData
@@ -11,7 +10,7 @@ def _make_file(name: str, code: str) -> FileData:
     return FileData(path=Path(name), content=code, module=parse_module(code))
 
 
-class TestAllFilesProcessed(TestCase):
+class TestAllFilesProcessed:
     def test_all_files_checked_when_first_has_violation(self):
         violation_code = "hasattr(obj, 'x')\n"
         clean_code = "x = 1\n"
@@ -25,4 +24,4 @@ class TestAllFilesProcessed(TestCase):
             modifier, "_check_file", wraps=modifier._check_file
         ) as spy:
             modifier.modify(files)
-        self.assertEqual(spy.call_count, len(files))
+        assert spy.call_count == len(files)

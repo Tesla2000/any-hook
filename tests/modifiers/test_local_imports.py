@@ -14,8 +14,7 @@ class TestLocalImports(TransformerTestCase):
                 import os
                 return os.path
         """).lstrip()
-        result = self._check_code(code)
-        self.assertTrue(result)
+        assert self._check_code(code)
 
     def test_detects_import_from_in_function(self):
         code = dedent("""
@@ -23,8 +22,7 @@ class TestLocalImports(TransformerTestCase):
                 from os import path
                 return path
         """).lstrip()
-        result = self._check_code(code)
-        self.assertTrue(result)
+        assert self._check_code(code)
 
     def test_detects_import_in_class(self):
         code = dedent("""
@@ -33,8 +31,7 @@ class TestLocalImports(TransformerTestCase):
                     import sys
                     return sys.version
         """).lstrip()
-        result = self._check_code(code)
-        self.assertTrue(result)
+        assert self._check_code(code)
 
     def test_ignores_top_level_imports(self):
         code = dedent("""
@@ -44,8 +41,7 @@ class TestLocalImports(TransformerTestCase):
             def foo():
                 return os.path
         """).lstrip()
-        result = self._check_code(code)
-        self.assertFalse(result)
+        assert not self._check_code(code)
 
     def test_ignores_import_with_ignore_comment(self):
         code = dedent("""
@@ -53,8 +49,7 @@ class TestLocalImports(TransformerTestCase):
                 import os  # ignore
                 return os.path
         """).lstrip()
-        result = self._check_code(code)
-        self.assertFalse(result)
+        assert not self._check_code(code)
 
     def test_ignores_import_from_with_ignore_comment(self):
         code = dedent("""
@@ -62,8 +57,7 @@ class TestLocalImports(TransformerTestCase):
                 from os import path  # ignore
                 return path
         """).lstrip()
-        result = self._check_code(code)
-        self.assertFalse(result)
+        assert not self._check_code(code)
 
     def test_detects_multiple_local_imports(self):
         code = dedent("""
@@ -72,8 +66,7 @@ class TestLocalImports(TransformerTestCase):
                 import sys
                 return os.path, sys.version
         """).lstrip()
-        result = self._check_code(code)
-        self.assertTrue(result)
+        assert self._check_code(code)
 
     def test_detects_nested_function_import(self):
         code = dedent("""
@@ -83,8 +76,7 @@ class TestLocalImports(TransformerTestCase):
                     return os.path
                 return inner
         """).lstrip()
-        result = self._check_code(code)
-        self.assertTrue(result)
+        assert self._check_code(code)
 
     def test_mixed_imports(self):
         code = dedent("""
@@ -94,8 +86,7 @@ class TestLocalImports(TransformerTestCase):
                 from sys import path
                 return path
         """).lstrip()
-        result = self._check_code(code)
-        self.assertTrue(result)
+        assert self._check_code(code)
 
     def test_custom_ignore_pattern(self):
         code = dedent("""
@@ -104,8 +95,7 @@ class TestLocalImports(TransformerTestCase):
                 return os.path
         """).lstrip()
         modifier = LocalImports(ignore_pattern=r"#\s*noqa")
-        result = self._check_code_with_modifier(code, modifier)
-        self.assertFalse(result)
+        assert not self._check_code_with_modifier(code, modifier)
 
     def test_custom_ignore_pattern_not_matching(self):
         code = dedent("""
@@ -114,8 +104,7 @@ class TestLocalImports(TransformerTestCase):
                 return os.path
         """).lstrip()
         modifier = LocalImports(ignore_pattern=r"#\s*noqa")
-        result = self._check_code_with_modifier(code, modifier)
-        self.assertTrue(result)
+        assert self._check_code_with_modifier(code, modifier)
 
     def test_ignore_pattern_case_insensitive(self):
         code = dedent("""
@@ -123,8 +112,7 @@ class TestLocalImports(TransformerTestCase):
                 import os  # IGNORE
                 return os.path
         """).lstrip()
-        result = self._check_code(code)
-        self.assertFalse(result)
+        assert not self._check_code(code)
 
     def test_detects_nested_module_import(self):
         code = dedent("""
@@ -132,8 +120,7 @@ class TestLocalImports(TransformerTestCase):
                 from urllib.parse import urlparse
                 return urlparse("http://example.com")
         """).lstrip()
-        result = self._check_code(code)
-        self.assertTrue(result)
+        assert self._check_code(code)
 
     def _check_code(self, code: str) -> bool:
         file_data = FileData(
@@ -148,3 +135,6 @@ class TestLocalImports(TransformerTestCase):
             path=Path("test.py"), content=code, module=parse_module(code)
         )
         return modifier.modify([file_data])
+
+    def _create_transformer(self):
+        raise NotImplementedError

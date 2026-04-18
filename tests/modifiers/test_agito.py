@@ -1,6 +1,5 @@
 import re
 from pathlib import Path
-from unittest import TestCase
 from unittest.mock import MagicMock
 from unittest.mock import patch
 
@@ -67,7 +66,7 @@ class TestAgitoTransformer(TransformerTestCase):
             .visit(_TypingToBuiltinTransformer(_IGNORE, ModuleImportAdder()))
         )
         merged = module.visit(_AgitoTransformer(_make_transformers()))
-        self.assertEqual(sequential.code, merged.code)
+        assert sequential.code == merged.code
 
     def test_each_transformer_still_applies_independently(self):
         code = "if len(items):\n    pass\n"
@@ -91,7 +90,7 @@ class TestAgitoTransformer(TransformerTestCase):
         return _AgitoTransformer(_make_transformers())
 
 
-class TestAgitoGlobalModifiers(TestCase):
+class TestAgitoGlobalModifiers:
     def test_check_untracked_called_once_for_multiple_files(self):
         agito = Agito(modifiers=(CheckUntracked(directories=("src",)),))
         files = [
@@ -105,7 +104,7 @@ class TestAgitoGlobalModifiers(TestCase):
         ):
             mock_run.return_value = MagicMock(stdout="")
             agito.modify(iter(files))
-        self.assertEqual(mock_run.call_count, 1)
+        assert mock_run.call_count == 1
 
     def test_check_untracked_called_once_alongside_separate_modifier(self):
         agito = Agito(
@@ -118,7 +117,7 @@ class TestAgitoGlobalModifiers(TestCase):
         ):
             mock_run.return_value = MagicMock(stdout="")
             agito.modify(iter(files))
-        self.assertEqual(mock_run.call_count, 1)
+        assert mock_run.call_count == 1
 
     def test_workflow_env_to_example_called_once_for_multiple_files(self):
         modifier = WorkflowEnvToExample(
@@ -133,4 +132,4 @@ class TestAgitoGlobalModifiers(TestCase):
         ]
         with patch(_WORKFLOW_MODIFY, return_value=False) as mock_modify:
             agito.modify(iter(files))
-        self.assertEqual(mock_modify.call_count, 1)
+        assert mock_modify.call_count == 1

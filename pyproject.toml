@@ -12,18 +12,38 @@ dependencies = [
     "more-itertools>=10.7.0",
     "pydantic-settings>=2.10.1",
     "transaction>=5.0",
-    "subclass-getter",
     "autoimport>=1.6.1",
+    "subclass-getter>=0.1.3",
 ]
 
 [project.optional-dependencies]
 workflow-env-to-example = ["pyyaml>=6.0.0"]
-generate-stubs = ["mypy>=1.0.0"]
 docs = [
     "sphinx>=7.0.0",
     "sphinx-autodoc-typehints>=1.24.0",
     "sphinx-rtd-theme>=1.3.0",
 ]
+
+[dependency-groups]
+test = [
+    "pytest>=9.0.3",
+    "pytest-cov>=7.1.0",
+]
+dev = [
+    {include-group = "test"},
+    "mypy",
+    "pre-commit"
+]
+
+
+[tool.coverage.run]
+branch = true
+source = ["any_hook"]
+
+[tool.coverage.report]
+fail_under = 100
+show_missing = true
+skip_covered = true
 
 [project.scripts]
 any-hook = "any_hook:main"
@@ -34,6 +54,3 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["any_hook"]
-
-[tool.uv.sources]
-subclass-getter = { git = "https://github.com/Tesla2000/subclass-getter.git" }
