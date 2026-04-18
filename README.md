@@ -65,6 +65,28 @@ All modifiers share the following common options:
 }
 ```
 
+### any-to-object
+
+Transforms `Any` type hints to `object`.
+
+**What it does:**
+- Converts `Any` to `object` in type annotations
+- Handles complex types: `list[Any]`, `dict[str, Any]`, `Union[Any, str]`, etc.
+- Removes `from typing import Any` if it becomes unused (or removes just the alias from a multi-import)
+- Leaves non-annotation uses of `Any` unchanged
+
+**Example:**
+```python
+# Before
+from typing import Any
+def foo(x: Any) -> list[Any]:
+    return [x]
+
+# After
+def foo(x: object) -> list[object]:
+    return [x]
+```
+
 ### object-to-any
 
 Transforms `object` type hints to `Any` for better type checking compatibility.
@@ -400,6 +422,55 @@ def foo():
 # After
 def foo():
     return x, y
+```
+
+### remove-f-prefix
+
+Removes the `f` prefix from f-strings that contain no placeholders.
+
+**What it does:**
+- Converts `f"text"` → `"text"` when the string has no `{...}` expressions
+- Handles all quote styles: `f"..."`, `f'...'`, `f"""..."""`, `f'''...'''`
+- Leaves f-strings with placeholders unchanged
+
+**Example:**
+```python
+# Before
+x = f"hello world"
+msg = f"""no placeholders here"""
+
+# After
+x = "hello world"
+msg = """no placeholders here"""
+```
+
+### open-to-path
+
+Converts `with open()` context managers to `Path.read_text` / `write_text` / `read_bytes` / `write_bytes` calls.
+
+**What it does:**
+- Replaces single-body `with open(path) as f: content = f.read()` with `content = Path(path).read_text()`
+- Handles all common modes: `"r"` / `"rt"` / default → `read_text`, `"rb"` → `read_bytes`, `"w"` / `"wt"` → `write_text`, `"wb"` → `write_bytes`
+- Passes through compatible kwargs: `encoding`, `errors` (text modes); `newline` (write only)
+- Supports multiple opens in one `with` statement when each body statement uses one handle
+- Automatically adds `from pathlib import Path` if not present
+- Skips if body has multiple statements per handle, unknown mode, or incompatible kwargs (`closefd`, etc.)
+
+**Example:**
+```python
+# Before
+with open("data.txt", encoding="utf-8") as f:
+    content = f.read()
+
+with open("out.txt", "w") as a, open("log.txt", "w") as b:
+    a.write(result)
+    b.write(summary)
+
+# After
+from pathlib import Path
+content = Path("data.txt").read_text(encoding="utf-8")
+Path("out.txt").write_text(result)
+Path("log.txt").write_text(summary)
 ```
 
 ### agito
