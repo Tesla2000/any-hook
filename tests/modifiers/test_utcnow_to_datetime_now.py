@@ -200,7 +200,7 @@ class TestUtcNowToDatetimeNow(TransformerTestCase):
                 re.compile(r"#\s*ignore", re.IGNORECASE), ModuleImportAdder()
             )
         )
-        self.assertNotIn("from datetime import", result.code)
+        assert "from datetime import" not in result.code
 
     def test_module_style_multiple_occurrences(self):
         code = dedent("""

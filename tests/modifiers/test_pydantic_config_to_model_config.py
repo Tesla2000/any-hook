@@ -2,9 +2,9 @@ import re
 import tempfile
 from pathlib import Path
 from textwrap import dedent
-from unittest import TestCase
 
 import libcst
+import pytest
 from any_hook._file_data import FileData
 from any_hook.files_modifiers._import_adder import ModuleImportAdder
 from any_hook.files_modifiers.pydantic_config_to_model_config import (
@@ -308,7 +308,7 @@ class TestPydanticConfigToModelConfig(TransformerTestCase):
                 model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(frozen=False)
                 name: str
         """).lstrip()
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             self._assert_transformation(code, code)
 
     def test_inline_kwargs_model_config_assign_no_annotation_gets_upgraded(
@@ -337,7 +337,7 @@ class TestPydanticConfigToModelConfig(TransformerTestCase):
         )
 
 
-class TestPydanticConfigConflictIntegration(TestCase):
+class TestPydanticConfigConflictIntegration:
     def test_conflict_raises_with_message_and_causes_exit_code_1(self):
         code = dedent("""
             from pydantic import BaseModel, ConfigDict
@@ -353,9 +353,9 @@ class TestPydanticConfigConflictIntegration(TestCase):
             tmp_path = Path(f.name)
         try:
             file_data = FileData(tmp_path, code, libcst.parse_module(code))
-            with self.assertRaises(ValueError) as ctx:
+            with pytest.raises(ValueError) as exc_info:
                 PydanticConfigToModelConfig().modify([file_data])
-            self.assertIn("frozen", str(ctx.exception))
-            self.assertEqual(tmp_path.read_text(), code)
+            assert "frozen" in str(exc_info.value)
+            assert tmp_path.read_text() == code
         finally:
             tmp_path.unlink(missing_ok=True)

@@ -34,8 +34,8 @@ class TestStrEnumInheritance(TransformerTestCase):
             )
             modifier = StrEnumInheritance(convert_to_auto=False)
             result = modifier.modify([file_data])
-            self.assertTrue(result)
-            self.assertEqual(file_path.read_text(), expected_code)
+            assert result
+            assert file_path.read_text() == expected_code
 
     def test_converts_enum_str_inheritance_to_strenum(self):
         original_code = dedent("""
@@ -62,8 +62,8 @@ class TestStrEnumInheritance(TransformerTestCase):
             )
             modifier = StrEnumInheritance(convert_to_auto=False)
             result = modifier.modify([file_data])
-            self.assertTrue(result)
-            self.assertEqual(file_path.read_text(), expected_code)
+            assert result
+            assert file_path.read_text() == expected_code
 
     def test_keeps_enum_import_when_still_used(self):
         original_code = dedent("""
@@ -94,8 +94,8 @@ class TestStrEnumInheritance(TransformerTestCase):
             )
             modifier = StrEnumInheritance(convert_to_auto=False)
             result = modifier.modify([file_data])
-            self.assertTrue(result)
-            self.assertEqual(file_path.read_text(), expected_code)
+            assert result
+            assert file_path.read_text() == expected_code
 
     def test_handles_multiple_str_enum_classes(self):
         original_code = dedent("""
@@ -130,8 +130,8 @@ class TestStrEnumInheritance(TransformerTestCase):
             )
             modifier = StrEnumInheritance(convert_to_auto=False)
             result = modifier.modify([file_data])
-            self.assertTrue(result)
-            self.assertEqual(file_path.read_text(), expected_code)
+            assert result
+            assert file_path.read_text() == expected_code
 
     def test_does_not_modify_single_enum_inheritance(self):
         original_code = dedent("""
@@ -150,8 +150,8 @@ class TestStrEnumInheritance(TransformerTestCase):
             )
             modifier = StrEnumInheritance()
             result = modifier.modify([file_data])
-            self.assertFalse(result)
-            self.assertEqual(file_path.read_text(), original_code)
+            assert not result
+            assert file_path.read_text() == original_code
 
     def test_does_not_modify_int_enum_inheritance(self):
         original_code = dedent("""
@@ -170,8 +170,8 @@ class TestStrEnumInheritance(TransformerTestCase):
             )
             modifier = StrEnumInheritance()
             result = modifier.modify([file_data])
-            self.assertFalse(result)
-            self.assertEqual(file_path.read_text(), original_code)
+            assert not result
+            assert file_path.read_text() == original_code
 
     def test_does_not_modify_three_base_classes(self):
         original_code = dedent("""
@@ -190,8 +190,8 @@ class TestStrEnumInheritance(TransformerTestCase):
             )
             modifier = StrEnumInheritance()
             result = modifier.modify([file_data])
-            self.assertFalse(result)
-            self.assertEqual(file_path.read_text(), original_code)
+            assert not result
+            assert file_path.read_text() == original_code
 
     def test_creates_enum_import_when_not_present(self):
         original_code = dedent("""
@@ -216,8 +216,8 @@ class TestStrEnumInheritance(TransformerTestCase):
             )
             modifier = StrEnumInheritance(convert_to_auto=False)
             result = modifier.modify([file_data])
-            self.assertTrue(result)
-            self.assertEqual(file_path.read_text(), expected_code)
+            assert result
+            assert file_path.read_text() == expected_code
 
     def test_preserves_existing_strenum_import(self):
         original_code = dedent("""
@@ -250,8 +250,8 @@ class TestStrEnumInheritance(TransformerTestCase):
                 convert_to_auto=False, convert_existing_str_enum=False
             )
             result = modifier.modify([file_data])
-            self.assertTrue(result)
-            self.assertEqual(file_path.read_text(), expected_code)
+            assert result
+            assert file_path.read_text() == expected_code
 
     def test_does_not_modify_files_without_enum(self):
         original_code = dedent("""
@@ -268,8 +268,8 @@ class TestStrEnumInheritance(TransformerTestCase):
             )
             modifier = StrEnumInheritance()
             result = modifier.modify([file_data])
-            self.assertFalse(result)
-            self.assertEqual(file_path.read_text(), original_code)
+            assert not result
+            assert file_path.read_text() == original_code
 
     def test_does_not_modify_files_without_str(self):
         original_code = dedent("""
@@ -288,8 +288,8 @@ class TestStrEnumInheritance(TransformerTestCase):
             )
             modifier = StrEnumInheritance()
             result = modifier.modify([file_data])
-            self.assertFalse(result)
-            self.assertEqual(file_path.read_text(), original_code)
+            assert not result
+            assert file_path.read_text() == original_code
 
     def test_preserves_other_enum_imports(self):
         original_code = dedent("""
@@ -314,8 +314,8 @@ class TestStrEnumInheritance(TransformerTestCase):
             )
             modifier = StrEnumInheritance(convert_to_auto=False)
             result = modifier.modify([file_data])
-            self.assertTrue(result)
-            self.assertEqual(file_path.read_text(), expected_code)
+            assert result
+            assert file_path.read_text() == expected_code
 
     def test_handles_import_star(self):
         original_code = dedent("""
@@ -340,8 +340,8 @@ class TestStrEnumInheritance(TransformerTestCase):
             )
             modifier = StrEnumInheritance(convert_to_auto=False)
             result = modifier.modify([file_data])
-            self.assertTrue(result)
-            self.assertEqual(file_path.read_text(), expected_code)
+            assert result
+            assert file_path.read_text() == expected_code
 
     def test_mixed_enums_with_methods(self):
         original_code = dedent("""
@@ -378,8 +378,8 @@ class TestStrEnumInheritance(TransformerTestCase):
             )
             modifier = StrEnumInheritance(convert_to_auto=False)
             result = modifier.modify([file_data])
-            self.assertTrue(result)
-            self.assertEqual(file_path.read_text(), expected_code)
+            assert result
+            assert file_path.read_text() == expected_code
 
     def test_converts_to_auto_when_enabled(self):
         original_code = dedent("""
@@ -406,8 +406,8 @@ class TestStrEnumInheritance(TransformerTestCase):
             )
             modifier = StrEnumInheritance(convert_to_auto=True)
             result = modifier.modify([file_data])
-            self.assertTrue(result)
-            self.assertEqual(file_path.read_text(), expected_code)
+            assert result
+            assert file_path.read_text() == expected_code
 
     def test_does_not_convert_to_auto_when_disabled(self):
         original_code = dedent("""
@@ -434,8 +434,8 @@ class TestStrEnumInheritance(TransformerTestCase):
             )
             modifier = StrEnumInheritance(convert_to_auto=False)
             result = modifier.modify([file_data])
-            self.assertTrue(result)
-            self.assertEqual(file_path.read_text(), expected_code)
+            assert result
+            assert file_path.read_text() == expected_code
 
     def test_converts_to_auto_only_matching_values(self):
         original_code = dedent("""
@@ -464,8 +464,8 @@ class TestStrEnumInheritance(TransformerTestCase):
             )
             modifier = StrEnumInheritance(convert_to_auto=True)
             result = modifier.modify([file_data])
-            self.assertTrue(result)
-            self.assertEqual(file_path.read_text(), expected_code)
+            assert result
+            assert file_path.read_text() == expected_code
 
     def test_preserves_existing_auto_import(self):
         original_code = dedent("""
@@ -492,8 +492,8 @@ class TestStrEnumInheritance(TransformerTestCase):
             )
             modifier = StrEnumInheritance(convert_to_auto=True)
             result = modifier.modify([file_data])
-            self.assertTrue(result)
-            self.assertEqual(file_path.read_text(), expected_code)
+            assert result
+            assert file_path.read_text() == expected_code
 
     def test_handles_uppercase_values(self):
         original_code = dedent("""
@@ -520,8 +520,8 @@ class TestStrEnumInheritance(TransformerTestCase):
             )
             modifier = StrEnumInheritance(convert_to_auto=True)
             result = modifier.modify([file_data])
-            self.assertTrue(result)
-            self.assertEqual(file_path.read_text(), expected_code)
+            assert result
+            assert file_path.read_text() == expected_code
 
     def test_handles_annotated_assignments_with_auto(self):
         original_code = dedent("""
@@ -548,8 +548,8 @@ class TestStrEnumInheritance(TransformerTestCase):
             )
             modifier = StrEnumInheritance(convert_to_auto=True)
             result = modifier.modify([file_data])
-            self.assertTrue(result)
-            self.assertEqual(file_path.read_text(), expected_code)
+            assert result
+            assert file_path.read_text() == expected_code
 
     def test_does_not_convert_non_matching_case(self):
         original_code = dedent("""
@@ -574,8 +574,8 @@ class TestStrEnumInheritance(TransformerTestCase):
             )
             modifier = StrEnumInheritance(convert_to_auto=True)
             result = modifier.modify([file_data])
-            self.assertTrue(result)
-            self.assertEqual(file_path.read_text(), expected_code)
+            assert result
+            assert file_path.read_text() == expected_code
 
     def test_converts_existing_str_enum_to_auto(self):
         original_code = dedent("""
@@ -604,8 +604,8 @@ class TestStrEnumInheritance(TransformerTestCase):
                 convert_to_auto=True, convert_existing_str_enum=True
             )
             result = modifier.modify([file_data])
-            self.assertTrue(result)
-            self.assertEqual(file_path.read_text(), expected_code)
+            assert result
+            assert file_path.read_text() == expected_code
 
     def test_does_not_convert_existing_str_enum_when_flag_disabled(self):
         original_code = dedent("""
@@ -627,8 +627,8 @@ class TestStrEnumInheritance(TransformerTestCase):
                 convert_to_auto=True, convert_existing_str_enum=False
             )
             result = modifier.modify([file_data])
-            self.assertFalse(result)
-            self.assertEqual(file_path.read_text(), original_code)
+            assert not result
+            assert file_path.read_text() == original_code
 
     def test_converts_existing_str_enum_with_mixed_values(self):
         original_code = dedent("""
@@ -659,8 +659,8 @@ class TestStrEnumInheritance(TransformerTestCase):
                 convert_to_auto=True, convert_existing_str_enum=True
             )
             result = modifier.modify([file_data])
-            self.assertTrue(result)
-            self.assertEqual(file_path.read_text(), expected_code)
+            assert result
+            assert file_path.read_text() == expected_code
 
     def test_converts_both_new_and_existing_str_enum(self):
         original_code = dedent("""
@@ -693,8 +693,8 @@ class TestStrEnumInheritance(TransformerTestCase):
                 convert_to_auto=True, convert_existing_str_enum=True
             )
             result = modifier.modify([file_data])
-            self.assertTrue(result)
-            self.assertEqual(file_path.read_text(), expected_code)
+            assert result
+            assert file_path.read_text() == expected_code
 
     def test_existing_str_enum_without_convert_to_auto(self):
         original_code = dedent("""
@@ -716,5 +716,8 @@ class TestStrEnumInheritance(TransformerTestCase):
                 convert_to_auto=False, convert_existing_str_enum=True
             )
             result = modifier.modify([file_data])
-            self.assertFalse(result)
-            self.assertEqual(file_path.read_text(), original_code)
+            assert not result
+            assert file_path.read_text() == original_code
+
+    def _create_transformer(self):
+        raise NotImplementedError
