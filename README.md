@@ -287,6 +287,48 @@ Checks for untracked files in specified directories and signals the hook to fail
         - '[{"type": "check-untracked", "directories": ["src/generated"]}]'
 ```
 
+### combine-with
+
+Combines nested `with` and `async with` statements into a single multi-item context manager.
+
+**What it does:**
+- Merges consecutive nested `with` or `async with` blocks into a single statement with multiple context items
+- Only merges when both nesting levels have the same type (both sync or both async)
+- Preserves context item ordering and `as` clauses
+- Leaves mixed sync/async nesting unchanged (a `with` wrapping `async with` or vice versa cannot be merged)
+
+**Example:**
+```python
+# Before
+with A:
+    with B:
+        body
+
+# After
+with A, B:
+    body
+```
+
+**Async example:**
+```python
+# Before
+async with A:
+    async with B:
+        body
+
+# After
+async with A, B:
+    body
+```
+
+**Mixed sync/async (unchanged):**
+```python
+# Before — left as-is
+with A:
+    async with B:
+        body
+```
+
 ### generate-stubs
 
 Generates type stub (`.pyi`) files for specified directories and post-processes them to produce accurate Pydantic model constructors.
