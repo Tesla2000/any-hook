@@ -1,20 +1,22 @@
 import re
-from typing import Any
 from typing import Literal
+
+from libcst import (
+    Arg,
+    BaseExpression,
+    Call,
+    If,
+    Name,
+    Not,
+    UnaryOperation,
+    While,
+)
 
 from any_hook._file_data import FileData
 from any_hook.files_modifiers._ignore_aware_transformer import (
     IgnoreAwareTransformer,
 )
 from any_hook.files_modifiers.separate_modifier import SeparateModifier
-from libcst import Arg
-from libcst import BaseExpression
-from libcst import Call
-from libcst import If
-from libcst import Name
-from libcst import Not
-from libcst import UnaryOperation
-from libcst import While
 
 
 class _LenAsBoolTransformer(IgnoreAwareTransformer):
@@ -75,7 +77,7 @@ class _LenAsBoolTransformer(IgnoreAwareTransformer):
         return updated_node.with_changes(args=(Arg(value=inner_arg),))
 
     @staticmethod
-    def _is_len_call(node: Any) -> bool:
+    def _is_len_call(node: object) -> bool:
         return (
             isinstance(node, Call)
             and isinstance(node.func, Name)

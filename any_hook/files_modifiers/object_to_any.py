@@ -1,7 +1,18 @@
 import re
 import typing
-from typing import Any
-from typing import Literal
+from typing import Any, Literal
+
+from libcst import (
+    Annotation,
+    Attribute,
+    ImportFrom,
+    ImportStar,
+    Module,
+    Name,
+    Subscript,
+)
+from libcst.helpers import get_absolute_module_for_import
+from pydantic import Field
 
 from any_hook._file_data import FileData
 from any_hook.files_modifiers._ignore_aware_transformer import (
@@ -9,15 +20,6 @@ from any_hook.files_modifiers._ignore_aware_transformer import (
 )
 from any_hook.files_modifiers._import_adder import ModuleImportAdder
 from any_hook.files_modifiers.separate_modifier import SeparateModifier
-from libcst import Annotation
-from libcst import Attribute
-from libcst import ImportFrom
-from libcst import ImportStar
-from libcst import Module
-from libcst import Name
-from libcst import Subscript
-from libcst.helpers import get_absolute_module_for_import
-from pydantic import Field
 
 
 class _ObjectToAnyTransformer(IgnoreAwareTransformer):
@@ -106,7 +108,7 @@ class ObjectToAny(SeparateModifier[_ObjectToAnyTransformer]):
 
         After:
             >>> from typing import Any
-            >>> def foo(x: Any) -> list[Any]:
+            >>> def foo(x: object) -> list[Any]:
             ...     return [x]
 
     Note:

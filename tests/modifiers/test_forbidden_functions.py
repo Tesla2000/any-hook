@@ -1,9 +1,10 @@
 from pathlib import Path
 from textwrap import dedent
 
+from libcst import parse_module
+
 from any_hook._file_data import FileData
 from any_hook.files_modifiers.forbidden_functions import ForbiddenFunctions
-from libcst import parse_module
 from tests.modifiers._base import TransformerTestCase
 
 
@@ -182,6 +183,25 @@ class TestForbiddenFunctions(TransformerTestCase):
             forbidden_functions=(hasattr.__name__, getattr.__name__)
         )
         assert self._check_code_with_modifier(code, modifier)
+
+    def test_forbidden_with_excluded_path(self):
+        from pathlib import Path as PathlibPath
+        from tempfile import TemporaryDirectory
+
+        code = dedent("""
+            x = eval("1+1")
+        """).lstrip()
+        with TemporaryDirectory() as tmpdir:
+            test_file = PathlibPath(tmpdir) / "test.py"
+            test_file.write_text(code)
+            modifier = ForbiddenFunctions(
+                forbidden_functions=("eval",),
+                excluded_paths=(str(test_file),),
+            )
+            file_data = FileData(
+                path=test_file, content=code, module=parse_module(code)
+            )
+            assert not modifier.modify([file_data])
 
     def _create_transformer(self):
         raise NotImplementedError

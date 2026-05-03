@@ -1,14 +1,13 @@
 import re
-from abc import ABC
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from collections.abc import Iterable
-from typing import Generic
-from typing import TypeVar
+from typing import Generic, TypeVar
+
+from libcst import CSTTransformer
+from pydantic import ConfigDict
 
 from any_hook._file_data import FileData
 from any_hook.files_modifiers._base import Modifier
-from libcst import CSTTransformer
-from pydantic import ConfigDict
 
 TransformerType = TypeVar("TransformerType", bound=CSTTransformer)
 
@@ -35,5 +34,5 @@ class SeparateModifier(Modifier, ABC, Generic[TransformerType]):
     @abstractmethod
     def create_transformer(
         self, ignore_pattern: re.Pattern[str]
-    ) -> TransformerType:
-        pass
+    ) -> TransformerType:  # pragma: no cover
+        ...

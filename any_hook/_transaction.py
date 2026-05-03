@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Generator
-from collections.abc import Iterable
+from collections.abc import Generator, Iterable
 from contextlib import contextmanager
 from itertools import tee
 from pathlib import Path
@@ -15,12 +14,12 @@ def transaction(
         filter(lambda path_: path_.suffix == ".py", paths),
         3,
     )
-    contents = map(Path.read_text, paths1)
+    contents1, contents2 = tee(map(Path.read_text, paths1), 2)
     try:
-        yield paths2, contents
+        yield paths2, contents1
     except BaseException:
         print("Reverting changes please wait until process is done...")
-        for path, content in zip(paths3, contents):
+        for path, content in zip(paths3, contents2):
             path.write_text(content)
         print("Changes reverted")
         raise

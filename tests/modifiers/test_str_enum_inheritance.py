@@ -1,10 +1,12 @@
+import re
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from textwrap import dedent
 
+from libcst import parse_module
+
 from any_hook._file_data import FileData
 from any_hook.files_modifiers.str_enum_inheritance import StrEnumInheritance
-from libcst import parse_module
 from tests.modifiers._base import TransformerTestCase
 
 
@@ -719,5 +721,293 @@ class TestStrEnumInheritance(TransformerTestCase):
             assert not result
             assert file_path.read_text() == original_code
 
+    def test_import_from_non_enum_module_not_checked(self):
+        code = dedent("""
+            from typing import Union
+            class MyClass(str, int):
+                pass
+        """).lstrip()
+        self._assert_no_transformation(code)
+
+    def test_class_with_no_bases_not_transformed(self):
+        code = dedent("""
+            from enum import Enum
+            class Plain:
+                pass
+        """).lstrip()
+        self._assert_no_transformation(code)
+
+    def test_class_with_three_bases_not_transformed(self):
+        code = dedent("""
+            from enum import Enum
+            class MyEnum(str, int, Enum):
+                pass
+        """).lstrip()
+        self._assert_no_transformation(code)
+
+    def test_class_with_attribute_base_not_transformed(self):
+        code = dedent("""
+            from enum import Enum
+            class MyEnum(module.Enum, str):
+                pass
+        """).lstrip()
+        self._assert_no_transformation(code)
+
+    def test_str_enum_with_base_non_name(self):
+        code = dedent("""
+            from enum import Enum
+            Base = str
+            class Status(Base, Enum):
+                ACTIVE = "active"
+        """).lstrip()
+        self._assert_no_transformation(code)
+
+    def test_str_enum_assignment_multiple_targets(self):
+        code = dedent("""
+            from enum import Enum
+            class Status(str, Enum):
+                ACTIVE = PENDING = "active"
+        """).lstrip()
+        expected = dedent("""
+            from enum import StrEnum
+            class Status(StrEnum):
+                ACTIVE = PENDING = "active"
+        """).lstrip()
+        # Should not convert to auto because multiple targets
+        self._assert_transformation(code, expected)
+
+    def test_str_enum_assignment_non_matching_case(self):
+        code = dedent("""
+            from enum import Enum
+            class Status(str, Enum):
+                active = "active"
+        """).lstrip()
+        expected = dedent("""
+            from enum import StrEnum
+            class Status(StrEnum):
+                active = "active"
+        """).lstrip()
+        self._assert_transformation(code, expected)
+
+    def test_str_enum_convert_to_auto_disabled(self):
+        code = dedent("""
+            from enum import Enum
+            class Status(str, Enum):
+                ACTIVE = "active"
+        """).lstrip()
+        expected = dedent("""
+            from enum import StrEnum
+            class Status(StrEnum):
+                ACTIVE = "active"
+        """).lstrip()
+        from any_hook.files_modifiers.str_enum_inheritance import (
+            _StrEnumInheritanceTransformer,
+        )
+
+        transformer = _StrEnumInheritanceTransformer(
+            re.compile(r"#\s*ignore", re.IGNORECASE), convert_to_auto=False
+        )
+        module = parse_module(code)
+        result = module.visit(transformer)
+        assert result.code == expected
+
+    def test_ann_assign_with_none_value(self):
+        code = dedent("""
+            from enum import Enum
+            class Status(str, Enum):
+                ACTIVE: str
+        """).lstrip()
+        expected = dedent("""
+            from enum import StrEnum
+            class Status(StrEnum):
+                ACTIVE: str
+        """).lstrip()
+        self._assert_transformation(code, expected)
+
+    def test_ann_assign_non_string_value(self):
+        code = dedent("""
+            from enum import Enum
+            class Status(str, Enum):
+                ACTIVE: str = 1
+        """).lstrip()
+        expected = dedent("""
+            from enum import StrEnum
+            class Status(StrEnum):
+                ACTIVE: str = 1
+        """).lstrip()
+        self._assert_transformation(code, expected)
+
+    def test_str_enum_with_ignored_class(self):
+        code = dedent("""
+            from enum import Enum
+            class Status(str, Enum):  # ignore
+                ACTIVE = "active"
+        """).lstrip()
+        self._assert_no_transformation(code)
+
+    def test_str_enum_convert_with_convert_to_auto(self):
+        code = dedent("""
+            from enum import Enum
+            class Status(str, Enum):
+                ACTIVE = "active"
+                PENDING = "pending"
+        """).lstrip()
+        expected = dedent("""
+            from enum import StrEnum, auto
+            class Status(StrEnum):
+                ACTIVE = auto()
+                PENDING = auto()
+        """).lstrip()
+        from any_hook.files_modifiers.str_enum_inheritance import (
+            _StrEnumInheritanceTransformer,
+        )
+
+        transformer = _StrEnumInheritanceTransformer(
+            re.compile(r"#\s*ignore", re.IGNORECASE), convert_to_auto=True
+        )
+        module = parse_module(code)
+        result = module.visit(transformer)
+        assert result.code == expected
+
+    def test_ann_assign_convert_with_convert_to_auto(self):
+        code = dedent("""
+            from enum import Enum
+            class Status(str, Enum):
+                ACTIVE: str = "active"
+                PENDING: str = "pending"
+        """).lstrip()
+        expected = dedent("""
+            from enum import StrEnum, auto
+            class Status(StrEnum):
+                ACTIVE: str = auto()
+                PENDING: str = auto()
+        """).lstrip()
+        from any_hook.files_modifiers.str_enum_inheritance import (
+            _StrEnumInheritanceTransformer,
+        )
+
+        transformer = _StrEnumInheritanceTransformer(
+            re.compile(r"#\s*ignore", re.IGNORECASE), convert_to_auto=True
+        )
+        module = parse_module(code)
+        result = module.visit(transformer)
+        assert result.code == expected
+
+    def test_assign_non_matching_member_name(self):
+        code = dedent("""
+            from enum import Enum
+            class Status(str, Enum):
+                ACTIVE = "different"
+        """).lstrip()
+        expected = dedent("""
+            from enum import StrEnum
+            class Status(StrEnum):
+                ACTIVE = "different"
+        """).lstrip()
+        from any_hook.files_modifiers.str_enum_inheritance import (
+            _StrEnumInheritanceTransformer,
+        )
+
+        transformer = _StrEnumInheritanceTransformer(
+            re.compile(r"#\s*ignore", re.IGNORECASE), convert_to_auto=True
+        )
+        module = parse_module(code)
+        result = module.visit(transformer)
+        assert result.code == expected
+
+    def test_ann_assign_non_matching_member_name(self):
+        code = dedent("""
+            from enum import Enum
+            class Status(str, Enum):
+                ACTIVE: str = "different"
+        """).lstrip()
+        expected = dedent("""
+            from enum import StrEnum
+            class Status(StrEnum):
+                ACTIVE: str = "different"
+        """).lstrip()
+        from any_hook.files_modifiers.str_enum_inheritance import (
+            _StrEnumInheritanceTransformer,
+        )
+
+        transformer = _StrEnumInheritanceTransformer(
+            re.compile(r"#\s*ignore", re.IGNORECASE), convert_to_auto=True
+        )
+        module = parse_module(code)
+        result = module.visit(transformer)
+        assert result.code == expected
+
+    def test_assign_multiple_targets_with_convert_to_auto(self):
+        code = dedent("""
+            from enum import Enum
+            class Status(str, Enum):
+                ACTIVE = PENDING = "active"
+        """).lstrip()
+        expected = dedent("""
+            from enum import StrEnum
+            class Status(StrEnum):
+                ACTIVE = PENDING = "active"
+        """).lstrip()
+        from any_hook.files_modifiers.str_enum_inheritance import (
+            _StrEnumInheritanceTransformer,
+        )
+
+        transformer = _StrEnumInheritanceTransformer(
+            re.compile(r"#\s*ignore", re.IGNORECASE), convert_to_auto=True
+        )
+        module = parse_module(code)
+        result = module.visit(transformer)
+        assert result.code == expected
+
+    def test_assign_attribute_target_with_convert_to_auto(self):
+        code = dedent("""
+            from enum import Enum
+            class Status(str, Enum):
+                obj.x = "active"
+        """).lstrip()
+        expected = dedent("""
+            from enum import StrEnum
+            class Status(StrEnum):
+                obj.x = "active"
+        """).lstrip()
+        from any_hook.files_modifiers.str_enum_inheritance import (
+            _StrEnumInheritanceTransformer,
+        )
+
+        transformer = _StrEnumInheritanceTransformer(
+            re.compile(r"#\s*ignore", re.IGNORECASE), convert_to_auto=True
+        )
+        module = parse_module(code)
+        result = module.visit(transformer)
+        assert result.code == expected
+
+    def test_ann_assign_attribute_target_with_convert_to_auto(self):
+        code = dedent("""
+            from enum import Enum
+            class Status(str, Enum):
+                obj.x: str = "active"
+        """).lstrip()
+        expected = dedent("""
+            from enum import StrEnum
+            class Status(StrEnum):
+                obj.x: str = "active"
+        """).lstrip()
+        from any_hook.files_modifiers.str_enum_inheritance import (
+            _StrEnumInheritanceTransformer,
+        )
+
+        transformer = _StrEnumInheritanceTransformer(
+            re.compile(r"#\s*ignore", re.IGNORECASE), convert_to_auto=True
+        )
+        module = parse_module(code)
+        result = module.visit(transformer)
+        assert result.code == expected
+
     def _create_transformer(self):
-        raise NotImplementedError
+        from any_hook.files_modifiers.str_enum_inheritance import (
+            _StrEnumInheritanceTransformer,
+        )
+
+        return _StrEnumInheritanceTransformer(
+            re.compile(r"#\s*ignore", re.IGNORECASE)
+        )

@@ -203,6 +203,48 @@ class TestObjectToAny(TransformerTestCase):
         """).lstrip()
         self._assert_transformation(code, expected)
 
+    def test_modify_file_with_object_processes(self):
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+
+        from libcst import parse_module
+
+        from any_hook._file_data import FileData
+        from any_hook.files_modifiers.object_to_any import ObjectToAny
+
+        code = "x: object = 5\n"
+        with TemporaryDirectory() as tmpdir:
+            test_file = Path(tmpdir) / "test.py"
+            test_file.write_text(code)
+            modifier = ObjectToAny()
+            file_data = FileData(
+                path=test_file,
+                content=code,
+                module=parse_module(code),
+            )
+            assert modifier._modify_file(file_data) is True
+
+    def test_skip_modify_file_without_object(self):
+        from libcst import parse_module
+
+        from any_hook._file_data import FileData
+        from any_hook.files_modifiers.object_to_any import ObjectToAny
+
+        modifier = ObjectToAny()
+        file_data = FileData(
+            path=None,
+            content="x = 5",
+            module=parse_module("x = 5"),
+        )
+        assert modifier._modify_file(file_data) is False
+
+    def test_object_from_non_typing_not_changed(self):
+        code = dedent("""
+            from mylib import object as MyObject
+            x: MyObject
+        """).lstrip()
+        self._assert_no_transformation(code)
+
     def _create_transformer(self) -> _ObjectToAnyTransformer:
         return _ObjectToAnyTransformer(
             re.compile(r"#\s*ignore", re.IGNORECASE), ModuleImportAdder()

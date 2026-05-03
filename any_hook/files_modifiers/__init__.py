@@ -1,5 +1,6 @@
-from typing import Annotated
-from typing import Union
+from typing import Annotated, Union
+
+from pydantic import Field
 
 from any_hook.files_modifiers._base import Modifier
 from any_hook.files_modifiers.agito import Agito
@@ -22,7 +23,6 @@ from any_hook.files_modifiers.return_tuple_parens_drop import (
 from any_hook.files_modifiers.str_enum_inheritance import StrEnumInheritance
 from any_hook.files_modifiers.typing_to_builtin import TypingToBuiltin
 from any_hook.files_modifiers.utcnow_to_datetime_now import UtcNowToDatetimeNow
-from pydantic import Field
 
 AnyModifier = Annotated[
     Union[
@@ -74,9 +74,9 @@ try:
         Union[AnyModifier, WorkflowEnvToExample], Field(discriminator="type")
     ]
     __all__.append("WorkflowEnvToExample")
-except ImportError as e:
-    print(
-        f"Package necessary to use workflow-env-to-example is not installed, "
+except ImportError as e:  # pragma: no cover
+    print(  # pragma: no cover
+        "Package necessary to use workflow-env-to-example is not installed, "
         f"workflow-env-to-example is disabled.\n{e}"
     )
 try:
@@ -86,9 +86,9 @@ try:
         Union[AnyModifier, GenerateStubs], Field(discriminator="type")
     ]
     __all__.append("GenerateStubs")
-except ImportError as e:
-    print(
-        f"Package necessary to use generate-stubs is not installed, "
+except ImportError as e:  # pragma: no cover
+    print(  # pragma: no cover
+        "Package necessary to use generate-stubs is not installed, "
         f"generate-stubs is disabled.\n{e}"
     )
 Agito.model_rebuild(_types_namespace={"AnyModifier": AnyModifier})

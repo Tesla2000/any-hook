@@ -1,8 +1,9 @@
 import typing
 from pathlib import Path
 
-from any_hook.files_modifiers import AnyModifier
 from pydantic import BaseModel
+
+from any_hook.files_modifiers import AnyModifier
 
 _README = Path(__file__).parent.parent / "README.md"
 

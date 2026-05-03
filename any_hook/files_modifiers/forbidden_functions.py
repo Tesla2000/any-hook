@@ -2,15 +2,11 @@ import re
 from collections.abc import Iterable
 from typing import Literal
 
+from libcst import Call, CSTVisitor, Expr, Module, Name, SimpleStatementLine
+from pydantic import Field
+
 from any_hook._file_data import FileData
 from any_hook.files_modifiers._base import Modifier
-from libcst import Call
-from libcst import CSTVisitor
-from libcst import Expr
-from libcst import Module
-from libcst import Name
-from libcst import SimpleStatementLine
-from pydantic import Field
 
 
 class _ForbiddenFunctionsVisitor(CSTVisitor):

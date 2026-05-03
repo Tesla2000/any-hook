@@ -1,16 +1,17 @@
 from collections.abc import Sequence
 
-from libcst import EmptyLine
-from libcst import ImportAlias
-from libcst import ImportFrom
-from libcst import ImportStar
-from libcst import MaybeSentinel
-from libcst import Module
-from libcst import Name
-from libcst import SimpleStatementLine
+from libcst import (
+    EmptyLine,
+    ImportAlias,
+    ImportFrom,
+    ImportStar,
+    MaybeSentinel,
+    Module,
+    Name,
+    SimpleStatementLine,
+)
 from libcst.helpers import get_absolute_module_for_import
-from pydantic import BaseModel
-from pydantic import ConfigDict
+from pydantic import BaseModel, ConfigDict
 
 
 class ModuleImportAdder(BaseModel):

@@ -1,9 +1,10 @@
 from pathlib import Path
 from textwrap import dedent
 
+from libcst import parse_module
+
 from any_hook._file_data import FileData
 from any_hook.files_modifiers.local_imports import LocalImports
-from libcst import parse_module
 from tests.modifiers._base import TransformerTestCase
 
 
@@ -121,6 +122,24 @@ class TestLocalImports(TransformerTestCase):
                 return urlparse("http://example.com")
         """).lstrip()
         assert self._check_code(code)
+
+    def test_excluded_path_skipped(self):
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+
+        code = dedent("""
+            def foo():
+                import os
+                return os.path.exists(".")
+        """).lstrip()
+        with TemporaryDirectory() as tmpdir:
+            test_file = Path(tmpdir) / "test.py"
+            test_file.write_text(code)
+            modifier = LocalImports(excluded_paths=(str(test_file),))
+            file_data = FileData(
+                path=test_file, content=code, module=parse_module(code)
+            )
+            assert not modifier.modify([file_data])
 
     def _check_code(self, code: str) -> bool:
         file_data = FileData(

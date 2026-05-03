@@ -1,15 +1,13 @@
 import re
-from typing import Literal
-from typing import Union
+from typing import Literal, Union
+
+from libcst import FormattedString, FormattedStringExpression, SimpleString
 
 from any_hook._file_data import FileData
 from any_hook.files_modifiers._ignore_aware_transformer import (
     IgnoreAwareTransformer,
 )
 from any_hook.files_modifiers.separate_modifier import SeparateModifier
-from libcst import FormattedString
-from libcst import FormattedStringExpression
-from libcst import SimpleString
 
 
 class _RemoveFPrefixTransformer(IgnoreAwareTransformer):

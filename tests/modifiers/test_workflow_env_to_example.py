@@ -3,6 +3,7 @@ from tempfile import TemporaryDirectory
 from textwrap import dedent
 
 import pytest
+
 from any_hook.files_modifiers.workflow_env_to_example import (
     WorkflowEnvToExample,
 )
@@ -263,3 +264,62 @@ class TestWorkflowEnvToExample:
             assert "IGNORE_ME" not in content
             assert "ALSO_IGNORE" not in content
             assert "KEEP_ME=kept_value" in content
+
+    def test_skips_non_dict_yaml_content(self):
+        with TemporaryDirectory() as tmpdir:
+            tmpdir_path = Path(tmpdir)
+            workflow_file = tmpdir_path / "workflow.yml"
+            workflow_file.write_text("---\n- item1\n- item2\n")
+            output_file = tmpdir_path / ".env.example"
+            modifier = WorkflowEnvToExample(
+                workflow_paths=(workflow_file,),
+                output_path=output_file,
+            )
+            result = modifier.modify([])
+            assert result is False
+
+    def test_handles_existing_env_file_with_variables_and_comments(self):
+        with TemporaryDirectory() as tmpdir:
+            tmpdir_path = Path(tmpdir)
+            workflow_file = tmpdir_path / "workflow.yml"
+            workflow_file.write_text(dedent("""
+                name: Test
+                env:
+                  NEW_VAR: new_value
+            """))
+            output_file = tmpdir_path / ".env.example"
+            output_file.write_text(
+                "# This is a comment\nEXISTING_VAR=old_value\n"
+            )
+            modifier = WorkflowEnvToExample(
+                workflow_paths=(workflow_file,), output_path=output_file
+            )
+            result = modifier.modify([])
+            assert result
+            content = output_file.read_text()
+            assert "EXISTING_VAR=old_value" in content
+            assert "NEW_VAR=new_value" in content
+
+    def test_handles_non_dict_env_section(self):
+        with TemporaryDirectory() as tmpdir:
+            tmpdir_path = Path(tmpdir)
+            workflow_file = tmpdir_path / "workflow.yml"
+            workflow_file.write_text(dedent("""
+                name: Test
+                jobs:
+                  test:
+                    runs-on: ubuntu-latest
+                    env: "string_instead_of_dict"
+                    steps:
+                      - name: Step
+                        env:
+                          STEP_VAR: step_value
+            """))
+            output_file = tmpdir_path / ".env.example"
+            modifier = WorkflowEnvToExample(
+                workflow_paths=(workflow_file,), output_path=output_file
+            )
+            result = modifier.modify([])
+            assert result
+            content = output_file.read_text()
+            assert "STEP_VAR=step_value" in content

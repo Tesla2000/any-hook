@@ -2,17 +2,21 @@ import re
 from collections.abc import Iterable
 from typing import Literal
 
+from libcst import (
+    Call,
+    CSTVisitor,
+    Decorator,
+    Expr,
+    FunctionDef,
+    Module,
+    Name,
+    SimpleStatementLine,
+    SimpleString,
+)
+from pydantic import field_validator
+
 from any_hook._file_data import FileData
 from any_hook.files_modifiers._base import Modifier
-from libcst import Call
-from libcst import CSTVisitor
-from libcst import Decorator
-from libcst import Expr
-from libcst import FunctionDef
-from libcst import Module
-from libcst import Name
-from libcst import SimpleStatementLine
-from libcst import SimpleString
 
 
 class _ClsUsageVisitor(CSTVisitor):
@@ -44,20 +48,24 @@ class _FieldValidatorVisitor(CSTVisitor):
         if not cls_used and "*" not in field_names:
             self.violations.append(
                 f"{node.name.value}({', '.join(repr(f) for f in field_names)}): "
-                f"cls is not used or '*' is not among validated fields"
+                "cls is not used or '*' is not among validated fields"
             )
         return True
 
     @staticmethod
     def _find_field_validator_decorator(node: FunctionDef) -> Decorator | None:
         for decorator in node.decorators:
-            if (
-                isinstance(decorator.decorator, Call)
-                and isinstance(decorator.decorator.func, Name)
-                and decorator.decorator.func.value == "field_validator"
-            ):
+            if _FieldValidatorVisitor._is_field_validator_call(decorator):
                 return decorator
         return None
+
+    @staticmethod
+    def _is_field_validator_call(decorator: Decorator) -> bool:
+        if not isinstance(decorator.decorator, Call):
+            return False
+        if not isinstance(decorator.decorator.func, Name):
+            return False
+        return decorator.decorator.func.value == field_validator.__name__
 
     @staticmethod
     def _extract_field_names(decorator: Decorator) -> list[str]:
@@ -65,12 +73,16 @@ class _FieldValidatorVisitor(CSTVisitor):
         for arg in decorator.decorator.args:
             if arg.keyword is not None:
                 continue
-            if (
-                isinstance(arg.value, SimpleString)
-                and arg.value.evaluated_value
-            ):
-                names.append(arg.value.evaluated_value)
+            name = _FieldValidatorVisitor._extract_string_value(arg.value)
+            if name:
+                names.append(name)
         return names
+
+    @staticmethod
+    def _extract_string_value(value: object) -> str | None:
+        if not isinstance(value, SimpleString):
+            return None
+        return value.evaluated_value
 
     @staticmethod
     def _is_cls_used(node: FunctionDef) -> bool:

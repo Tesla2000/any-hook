@@ -1,5 +1,4 @@
-from libcst import CSTTransformer
-from libcst import parse_module
+from libcst import CSTTransformer, parse_module
 
 
 class TransformerTestCase:

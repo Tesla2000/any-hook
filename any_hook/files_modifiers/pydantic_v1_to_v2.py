@@ -1,16 +1,14 @@
 import re
-from typing import Literal
+from typing import Annotated, Literal
+
+from libcst import Attribute, Dot, Import, ImportFrom, Name
+from pydantic import Field
 
 from any_hook._file_data import FileData
 from any_hook.files_modifiers._ignore_aware_transformer import (
     IgnoreAwareTransformer,
 )
 from any_hook.files_modifiers.separate_modifier import SeparateModifier
-from libcst import Attribute
-from libcst import Dot
-from libcst import Import
-from libcst import ImportFrom
-from libcst import Name
 
 
 class _PydanticV1ToV2Transformer(IgnoreAwareTransformer):
@@ -19,13 +17,13 @@ class _PydanticV1ToV2Transformer(IgnoreAwareTransformer):
         self._made_changes = False
 
     def leave_ImportFrom(
-        self, _: ImportFrom, updated_node: ImportFrom
+        self, original: ImportFrom, updated_node: ImportFrom
     ) -> ImportFrom:
         if self._is_currently_ignored():
             return updated_node
-        if not updated_node.module:
+        if not original.module:
             return updated_node
-        module_parts = self._get_module_parts(updated_node.module)
+        module_parts = self._get_module_parts(original.module)
         if (
             len(module_parts) >= 2
             and module_parts[0] == "pydantic"
@@ -39,16 +37,15 @@ class _PydanticV1ToV2Transformer(IgnoreAwareTransformer):
             return updated_node.with_changes(module=new_module)
         return updated_node
 
-    def leave_Import(self, _: Import, updated_node: Import) -> Import:
+    def leave_Import(self, original: Import, updated_node: Import) -> Import:
         if self._is_currently_ignored():
             return updated_node
         new_names = []
         made_change = False
-        for alias in updated_node.names:
-            if not isinstance(alias.name, (Name, Attribute)):
-                new_names.append(alias)
-                continue
-            module_parts = self._get_module_parts(alias.name)
+        for original_alias, updated_alias in zip(
+            original.names, updated_node.names
+        ):
+            module_parts = self._get_module_parts(original_alias.name)
             if (
                 len(module_parts) >= 2
                 and module_parts[0] == "pydantic"
@@ -60,9 +57,9 @@ class _PydanticV1ToV2Transformer(IgnoreAwareTransformer):
                 else:
                     new_module_parts = ["pydantic"] + module_parts[2:]
                     new_name = self._build_module_name(new_module_parts)
-                new_names.append(alias.with_changes(name=new_name))
+                new_names.append(updated_alias.with_changes(name=new_name))
             else:
-                new_names.append(alias)
+                new_names.append(updated_alias)
         if made_change:
             self._made_changes = True
             return updated_node.with_changes(names=new_names)
@@ -90,9 +87,9 @@ class _PydanticV1ToV2Transformer(IgnoreAwareTransformer):
         parts.append(node.attr.value)
         return parts
 
-    def _build_module_name(self, parts: list[str]) -> Name | Attribute:
-        if len(parts) == 1:
-            return Name(parts[0])
+    def _build_module_name(
+        self, parts: Annotated[list[str], Field(min_length=2)]
+    ) -> Attribute:
         base = Name(parts[0])
         for part in parts[1:]:
             base = Attribute(value=base, attr=Name(part), dot=Dot())

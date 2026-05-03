@@ -1,5 +1,4 @@
-from unittest.mock import MagicMock
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from any_hook.files_modifiers.check_untracked import CheckUntracked
 
@@ -88,3 +87,13 @@ class TestCheckUntracked:
             mock_run.return_value = MagicMock(stdout="")
             modifier.modify(tracking_iter())
         assert consumed == []
+
+    def test_git_root_subprocess_call(self):
+        modifier = CheckUntracked(directories=("src",))
+        with patch(_MODULE) as mock_run:
+            mock_run.return_value = MagicMock(stdout="/repo\n")
+            git_root = modifier._git_root()
+            assert git_root == "/repo"
+            # Verify git rev-parse was called
+            call_args = mock_run.call_args_list[0]
+            assert "rev-parse" in call_args.args[0]

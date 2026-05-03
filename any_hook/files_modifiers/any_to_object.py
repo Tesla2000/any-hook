@@ -1,26 +1,30 @@
 import re
 import typing
 from collections.abc import Sequence
-from typing import Any
-from typing import Literal
-from typing import Union
+from typing import Any, Literal, TypeAlias, Union
+
+from libcst import (
+    Annotation,
+    Attribute,
+    BaseSmallStatement,
+    BaseStatement,
+    ImportAlias,
+    ImportFrom,
+    ImportStar,
+    Module,
+    Name,
+    SimpleStatementLine,
+    Subscript,
+)
+from libcst.helpers import get_absolute_module_for_import
 
 from any_hook._file_data import FileData
 from any_hook.files_modifiers._ignore_aware_transformer import (
     IgnoreAwareTransformer,
 )
 from any_hook.files_modifiers.separate_modifier import SeparateModifier
-from libcst import Annotation
-from libcst import Attribute
-from libcst import BaseStatement
-from libcst import ImportAlias
-from libcst import ImportFrom
-from libcst import ImportStar
-from libcst import Module
-from libcst import Name
-from libcst import SimpleStatementLine
-from libcst import Subscript
-from libcst.helpers import get_absolute_module_for_import
+
+SmallStatementType: TypeAlias = Union[ImportFrom, BaseSmallStatement]
 
 
 class _AnyToObjectTransformer(IgnoreAwareTransformer):
@@ -96,7 +100,8 @@ class _AnyToObjectTransformer(IgnoreAwareTransformer):
             return None
         return stmt.with_changes(body=new_small)
 
-    def _is_any_only_import(self, node: object) -> bool:
+    @staticmethod
+    def _is_any_only_import(node: SmallStatementType) -> bool:
         if not isinstance(node, ImportFrom):
             return False
         module = get_absolute_module_for_import(None, node)
@@ -107,9 +112,10 @@ class _AnyToObjectTransformer(IgnoreAwareTransformer):
         names: Sequence[ImportAlias] = node.names
         return len(names) == 1 and names[0].name.value == Any.__name__
 
-    def _remove_any_alias(self, node: object) -> object:
-        if not isinstance(node, ImportFrom):
-            return node
+    @staticmethod
+    def _remove_any_alias(node: SmallStatementType) -> SmallStatementType:
+        if not isinstance(node, ImportFrom):  # pragma: no cover
+            return node  # pragma: no cover
         module = get_absolute_module_for_import(None, node)
         if module != typing.__name__:
             return node
@@ -120,7 +126,7 @@ class _AnyToObjectTransformer(IgnoreAwareTransformer):
             alias for alias in names if alias.name.value != Any.__name__
         ]
         if len(remaining) == len(names):
-            return node
+            return node  # pragma: no cover
         return node.with_changes(names=remaining)
 
 
@@ -133,7 +139,7 @@ class AnyToObject(SeparateModifier[_AnyToObjectTransformer]):
     Examples:
         Before:
             >>> from typing import Any
-            >>> def foo(x: Any) -> list[Any]:
+            >>> def foo(x: object) -> list[Any]:
             ...     return [x]
 
         After:

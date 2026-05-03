@@ -1,17 +1,20 @@
 import re
 from typing import Literal
 
+from libcst import (
+    Comma,
+    Element,
+    ParenthesizedWhitespace,
+    Return,
+    RightParen,
+    Tuple,
+)
+
 from any_hook._file_data import FileData
 from any_hook.files_modifiers._ignore_aware_transformer import (
     IgnoreAwareTransformer,
 )
 from any_hook.files_modifiers.separate_modifier import SeparateModifier
-from libcst import Comma
-from libcst import Element
-from libcst import ParenthesizedWhitespace
-from libcst import Return
-from libcst import RightParen
-from libcst import Tuple
 
 
 class _ReturnTupleParensDropTransformer(IgnoreAwareTransformer):

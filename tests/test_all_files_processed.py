@@ -1,9 +1,10 @@
 from pathlib import Path
 from unittest.mock import patch
 
+from libcst import parse_module
+
 from any_hook._file_data import FileData
 from any_hook.files_modifiers.forbidden_functions import ForbiddenFunctions
-from libcst import parse_module
 
 
 def _make_file(name: str, code: str) -> FileData:

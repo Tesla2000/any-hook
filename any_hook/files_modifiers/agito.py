@@ -1,18 +1,13 @@
 import re
 from collections.abc import Iterable
-from typing import Annotated
-from typing import Literal
-from typing import TYPE_CHECKING
-from typing import Union
+from typing import TYPE_CHECKING, Annotated, Literal, Union
+
+from libcst import CSTNode, CSTTransformer, FlattenSentinel, RemovalSentinel
+from pydantic import Field
 
 from any_hook._file_data import FileData
 from any_hook.files_modifiers._base import Modifier
 from any_hook.files_modifiers.separate_modifier import SeparateModifier
-from libcst import CSTNode
-from libcst import CSTTransformer
-from libcst import FlattenSentinel
-from libcst import RemovalSentinel
-from pydantic import Field
 
 if TYPE_CHECKING:
     from any_hook.files_modifiers import AnyModifier
@@ -31,8 +26,6 @@ class _AgitoTransformer(CSTTransformer):
     ) -> Union[CSTNode, RemovalSentinel, FlattenSentinel]:
         result = updated_node
         for t in self._transformers:
-            if isinstance(result, (RemovalSentinel, FlattenSentinel)):
-                break
             result = t.on_leave(original_node, result)
         return result
 

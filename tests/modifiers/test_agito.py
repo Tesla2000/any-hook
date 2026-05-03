@@ -1,15 +1,17 @@
 import re
 from pathlib import Path
-from unittest.mock import MagicMock
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
+
+from libcst import parse_module
 
 from any_hook._file_data import FileData
 from any_hook.files_modifiers._import_adder import ModuleImportAdder
-from any_hook.files_modifiers.agito import _AgitoTransformer
-from any_hook.files_modifiers.agito import Agito
+from any_hook.files_modifiers.agito import Agito, _AgitoTransformer
 from any_hook.files_modifiers.check_untracked import CheckUntracked
-from any_hook.files_modifiers.len_as_bool import _LenAsBoolTransformer
-from any_hook.files_modifiers.len_as_bool import LenAsBool
+from any_hook.files_modifiers.len_as_bool import (
+    LenAsBool,
+    _LenAsBoolTransformer,
+)
 from any_hook.files_modifiers.return_tuple_parens_drop import (
     _ReturnTupleParensDropTransformer,
 )
@@ -19,7 +21,6 @@ from any_hook.files_modifiers.typing_to_builtin import (
 from any_hook.files_modifiers.workflow_env_to_example import (
     WorkflowEnvToExample,
 )
-from libcst import parse_module
 from tests.modifiers._base import TransformerTestCase
 
 _CHECK_UNTRACKED_MODULE = f"{CheckUntracked.__module__}.subprocess.run"
@@ -133,3 +134,20 @@ class TestAgitoGlobalModifiers:
         with patch(_WORKFLOW_MODIFY, return_value=False) as mock_modify:
             agito.modify(iter(files))
         assert mock_modify.call_count == 1
+
+    def test_excluded_path_skips_modification(self):
+        from tempfile import TemporaryDirectory
+
+        with TemporaryDirectory() as tmpdir:
+            test_file = Path(tmpdir) / "test.py"
+            test_file.write_text("if len(x):\n    pass\n")
+            agito = Agito(
+                modifiers=(LenAsBool(),),
+                excluded_paths=(str(test_file),),
+            )
+            file_data = FileData(
+                path=test_file,
+                content=test_file.read_text(),
+                module=parse_module(test_file.read_text()),
+            )
+            assert not agito.modify([file_data])

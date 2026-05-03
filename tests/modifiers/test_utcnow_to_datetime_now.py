@@ -1,9 +1,10 @@
 import re
 from textwrap import dedent
 
+from libcst import parse_module
+
 from any_hook.files_modifiers._import_adder import ModuleImportAdder
 from any_hook.files_modifiers.utcnow_to_datetime_now import _UtcNowTransformer
-from libcst import parse_module
 from tests.modifiers._base import TransformerTestCase
 
 
@@ -224,6 +225,201 @@ class TestUtcNowToDatetimeNow(TransformerTestCase):
 
     def test_method_utcnow_not_changed(self):
         code = "result = obj.utcnow()\n"
+        self._assert_no_transformation(code)
+
+    def test_utcnow_ignored(self):
+        code = dedent("""
+            from datetime import datetime
+            now = datetime.utcnow()  # ignore
+        """).lstrip()
+        self._assert_no_transformation(code)
+
+    def test_skip_modify_file_without_utcnow(self):
+        from libcst import parse_module
+
+        from any_hook._file_data import FileData
+        from any_hook.files_modifiers.utcnow_to_datetime_now import (
+            UtcNowToDatetimeNow,
+        )
+
+        modifier = UtcNowToDatetimeNow()
+        file_data = FileData(
+            path=None,
+            content="x = 5",
+            module=parse_module("x = 5"),
+        )
+        assert modifier._modify_file(file_data) is False
+
+    def test_utcnow_in_list_comprehension(self):
+        code = dedent("""
+            from datetime import datetime
+            times = [datetime.utcnow() for _ in range(3)]
+        """).lstrip()
+        expected = dedent("""
+            from datetime import datetime, UTC
+            times = [datetime.now(UTC) for _ in range(3)]
+        """).lstrip()
+        self._assert_transformation(code, expected)
+
+    def test_utcnow_in_dict_comprehension(self):
+        code = dedent("""
+            from datetime import datetime
+            mapping = {i: datetime.utcnow() for i in range(3)}
+        """).lstrip()
+        expected = dedent("""
+            from datetime import datetime, UTC
+            mapping = {i: datetime.now(UTC) for i in range(3)}
+        """).lstrip()
+        self._assert_transformation(code, expected)
+
+    def test_multiple_datetime_imports_uses_first(self):
+        code = dedent("""
+            from datetime import datetime, timedelta
+            from datetime import datetime as dt
+            now = datetime.utcnow()
+        """).lstrip()
+        expected = dedent("""
+            from datetime import datetime, timedelta, UTC
+            from datetime import datetime as dt
+            now = datetime.now(UTC)
+        """).lstrip()
+        self._assert_transformation(code, expected)
+
+    def test_utcnow_in_generator_expression(self):
+        code = dedent("""
+            from datetime import datetime
+            times = (datetime.utcnow() for _ in range(3))
+        """).lstrip()
+        expected = dedent("""
+            from datetime import datetime, UTC
+            times = (datetime.now(UTC) for _ in range(3))
+        """).lstrip()
+        self._assert_transformation(code, expected)
+
+    def test_utcnow_in_set_comprehension(self):
+        code = dedent("""
+            from datetime import datetime
+            times = {datetime.utcnow() for _ in range(3)}
+        """).lstrip()
+        expected = dedent("""
+            from datetime import datetime, UTC
+            times = {datetime.now(UTC) for _ in range(3)}
+        """).lstrip()
+        self._assert_transformation(code, expected)
+
+    def test_utcnow_in_lambda(self):
+        code = dedent("""
+            from datetime import datetime
+            get_time = lambda: datetime.utcnow()
+        """).lstrip()
+        expected = dedent("""
+            from datetime import datetime, UTC
+            get_time = lambda: datetime.now(UTC)
+        """).lstrip()
+        self._assert_transformation(code, expected)
+
+    def test_utcnow_in_return_statement(self):
+        code = dedent("""
+            from datetime import datetime, UTC
+            def get_now():
+                return datetime.utcnow()
+        """).lstrip()
+        expected = dedent("""
+            from datetime import datetime, UTC
+            def get_now():
+                return datetime.now(UTC)
+        """).lstrip()
+        self._assert_transformation(code, expected)
+
+    def test_utcnow_in_comparison(self):
+        code = dedent("""
+            from datetime import datetime
+            deadline = datetime(2024, 1, 1)
+            if datetime.utcnow() < deadline:
+                pass
+        """).lstrip()
+        expected = dedent("""
+            from datetime import datetime, UTC
+            deadline = datetime(2024, 1, 1)
+            if datetime.now(UTC) < deadline:
+                pass
+        """).lstrip()
+        self._assert_transformation(code, expected)
+
+    def test_utcnow_in_arithmetic(self):
+        code = dedent("""
+            from datetime import datetime, timedelta
+            now = datetime.utcnow() + timedelta(days=1)
+        """).lstrip()
+        expected = dedent("""
+            from datetime import datetime, timedelta, UTC
+            now = datetime.now(UTC) + timedelta(days=1)
+        """).lstrip()
+        self._assert_transformation(code, expected)
+
+    def test_utcnow_method_chaining(self):
+        code = dedent("""
+            from datetime import datetime
+            result = datetime.utcnow().isoformat()
+        """).lstrip()
+        expected = dedent("""
+            from datetime import datetime, UTC
+            result = datetime.now(UTC).isoformat()
+        """).lstrip()
+        self._assert_transformation(code, expected)
+
+    def test_module_style_utcnow_with_other_imports(self):
+        code = dedent("""
+            import datetime
+            import os
+            now = datetime.datetime.utcnow()
+        """).lstrip()
+        expected = dedent("""
+            import datetime
+            import os
+            now = datetime.datetime.now(datetime.UTC)
+        """).lstrip()
+        self._assert_transformation(code, expected)
+
+    def test_modify_file_with_utcnow_processes(self):
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+
+        from libcst import parse_module
+
+        from any_hook._file_data import FileData
+        from any_hook.files_modifiers.utcnow_to_datetime_now import (
+            UtcNowToDatetimeNow,
+        )
+
+        code = "from datetime import datetime\nnow = datetime.utcnow()\n"
+        with TemporaryDirectory() as tmpdir:
+            test_file = Path(tmpdir) / "test.py"
+            test_file.write_text(code)
+            modifier = UtcNowToDatetimeNow()
+            file_data = FileData(
+                path=test_file,
+                content=code,
+                module=parse_module(code),
+            )
+            assert modifier._modify_file(file_data) is True
+
+    def test_utcnow_as_argument_nested_call(self):
+        code = dedent("""
+            from datetime import datetime
+            result = max(datetime.utcnow(), other_time)
+        """).lstrip()
+        expected = dedent("""
+            from datetime import datetime, UTC
+            result = max(datetime.now(UTC), other_time)
+        """).lstrip()
+        self._assert_transformation(code, expected)
+
+    def test_bare_utcnow_ignored_in_bare_context(self):
+        code = dedent("""
+            from datetime import datetime
+            factory = datetime.utcnow  # ignore
+        """).lstrip()
         self._assert_no_transformation(code)
 
     def _create_transformer(self) -> _UtcNowTransformer:

@@ -2,25 +2,21 @@ from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
-from typing import Annotated
-from typing import Any
-from typing import ClassVar
-from typing import Optional
-from typing import Union
+from typing import Annotated, ClassVar, Optional, Union
 
 import libcst
+from pydantic import Field, TypeAdapter, field_validator
+from pydantic_settings import (
+    BaseSettings,
+    CliPositionalArg,
+    SettingsConfigDict,
+)
+from subclass_getter import get_subclasses
+
 from any_hook._file_data import FileData
 from any_hook._transaction import transaction
-from any_hook.files_modifiers import AnyModifier
-from any_hook.files_modifiers import Modifier
+from any_hook.files_modifiers import AnyModifier, Modifier
 from any_hook.files_modifiers.agito import Agito
-from pydantic import Field
-from pydantic import field_validator
-from pydantic import TypeAdapter
-from pydantic_settings import BaseSettings
-from pydantic_settings import CliPositionalArg
-from pydantic_settings import SettingsConfigDict
-from subclass_getter import get_subclasses
 
 
 class Main(BaseSettings):
@@ -72,7 +68,7 @@ class Main(BaseSettings):
 
     @field_validator("modifiers", mode="plain")
     @classmethod
-    def _validate_modifiers(cls, data: Any) -> list[AnyModifier]:
+    def _validate_modifiers(cls, data: object) -> list[AnyModifier]:
         return cls._modifiers_adapter.validate_python(data)
 
     def cli_cmd(self) -> bool:
@@ -94,5 +90,5 @@ class Main(BaseSettings):
             return any(list(map(lambda m: m.modify(files_data), modifiers)))
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     Main().cli_cmd()

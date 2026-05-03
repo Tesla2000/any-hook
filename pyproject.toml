@@ -45,6 +45,11 @@ fail_under = 100
 show_missing = true
 skip_covered = true
 
+
+[tool.isort]
+profile = "black"
+line_length = 79
+
 [project.scripts]
 any-hook = "any_hook:main"
 

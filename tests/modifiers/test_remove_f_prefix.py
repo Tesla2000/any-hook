@@ -69,6 +69,45 @@ class TestRemoveFPrefix(TransformerTestCase):
         code = 'x = "hello"'
         self._assert_no_transformation(code)
 
+    def test_skip_modify_file_without_f_strings(self):
+        from libcst import parse_module
+
+        from any_hook._file_data import FileData
+        from any_hook.files_modifiers.remove_f_prefix import RemoveFPrefix
+
+        modifier = RemoveFPrefix()
+        file_data = FileData(
+            path=None,
+            content='x = "hello"',
+            module=parse_module('x = "hello"'),
+        )
+        assert modifier._modify_file(file_data) is False
+
+    def test_modify_file_with_single_quotes(self):
+        import tempfile
+        from pathlib import Path
+
+        from libcst import parse_module
+
+        from any_hook._file_data import FileData
+        from any_hook.files_modifiers.remove_f_prefix import RemoveFPrefix
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            test_file = Path(tmpdir) / "test.py"
+            test_file.write_text("x = f'hello'")
+            modifier = RemoveFPrefix()
+            file_data = FileData(
+                path=test_file,
+                content="x = f'hello'",
+                module=parse_module("x = f'hello'"),
+            )
+            assert modifier._modify_file(file_data) is True
+            assert test_file.read_text() == "x = 'hello'"
+
+    def test_f_string_ignored(self):
+        code = 'x = f"hello"  # ignore'
+        self._assert_no_transformation(code)
+
     def _create_transformer(self) -> _RemoveFPrefixTransformer:
         return _RemoveFPrefixTransformer(
             re.compile(r"#\s*ignore", re.IGNORECASE)

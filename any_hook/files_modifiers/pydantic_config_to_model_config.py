@@ -1,34 +1,35 @@
 import re
-from typing import ClassVar
-from typing import Literal
+from typing import ClassVar, Literal
 
 import pydantic
+from libcst import (
+    AnnAssign,
+    Annotation,
+    Arg,
+    Assign,
+    AssignEqual,
+    Call,
+    ClassDef,
+    Comma,
+    ImportFrom,
+    IndentedBlock,
+    Index,
+    MaybeSentinel,
+    Module,
+    Name,
+    SimpleStatementLine,
+    SimpleWhitespace,
+    Subscript,
+    SubscriptElement,
+)
+from pydantic import ConfigDict, Field
+
 from any_hook._file_data import FileData
 from any_hook.files_modifiers._ignore_aware_transformer import (
     IgnoreAwareTransformer,
 )
 from any_hook.files_modifiers._import_adder import ModuleImportAdder
 from any_hook.files_modifiers.separate_modifier import SeparateModifier
-from libcst import AnnAssign
-from libcst import Annotation
-from libcst import Arg
-from libcst import Assign
-from libcst import AssignEqual
-from libcst import Call
-from libcst import ClassDef
-from libcst import Comma
-from libcst import ImportFrom
-from libcst import IndentedBlock
-from libcst import Index
-from libcst import MaybeSentinel
-from libcst import Module
-from libcst import Name
-from libcst import SimpleStatementLine
-from libcst import SimpleWhitespace
-from libcst import Subscript
-from libcst import SubscriptElement
-from pydantic import ConfigDict
-from pydantic import Field
 
 
 class _PydanticConfigToModelConfigTransformer(IgnoreAwareTransformer):
@@ -48,7 +49,10 @@ class _PydanticConfigToModelConfigTransformer(IgnoreAwareTransformer):
 
     def visit_ClassDef(self, node: ClassDef) -> bool:
         self._current_class_depth += 1
-        self._push_compound_ignore(node)
+        if isinstance(node.body, IndentedBlock):
+            self._push_compound_ignore(node)
+        else:
+            self._compound_ignored_stack.append(False)
         return True
 
     def leave_ClassDef(self, _: ClassDef, updated_node: ClassDef) -> ClassDef:
@@ -214,6 +218,10 @@ class _PydanticConfigToModelConfigTransformer(IgnoreAwareTransformer):
                 }
                 if "model_config" in target_names:
                     if not isinstance(body_item.value, Call):
+                        if inline_keys:
+                            raise ValueError(
+                                f"Conflicting model_config keys defined in both inline class kwargs and model_config: {inline_keys}"
+                            )
                         new_body.append(statement)
                         continue
                     existing_keys = {
@@ -280,8 +288,6 @@ class _PydanticConfigToModelConfigTransformer(IgnoreAwareTransformer):
 
     def visit_ImportFrom(self, node: ImportFrom) -> bool:
         if not node.module or not isinstance(node.module, Name):
-            return False
-        if isinstance(node.names, str):
             return False
         if node.module.value == pydantic.__name__:
             for alias in node.names:
