@@ -1,8 +1,16 @@
 import re
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from textwrap import dedent
 
+from libcst import parse_module
+
+from any_hook._file_data import FileData
 from any_hook.files_modifiers._import_adder import ModuleImportAdder
-from any_hook.files_modifiers.open_to_path import _OpenToPathTransformer
+from any_hook.files_modifiers.open_to_path import (
+    OpenToPath,
+    _OpenToPathTransformer,
+)
 from tests.modifiers._base import TransformerTestCase
 
 
@@ -471,8 +479,6 @@ class TestOpenToPath(TransformerTestCase):
             with open("file.txt") as f:
                 content = f.read()
         """).lstrip()
-        # The import will be added and transformation should happen
-        from libcst import parse_module
 
         result_code = parse_module(code).visit(self._create_transformer()).code
         # Check that transformation happened
@@ -487,8 +493,6 @@ class TestOpenToPath(TransformerTestCase):
             with open("file.txt") as f:
                 content = f.read()
         """).lstrip()
-        # Should still transform even though Path isn't imported yet
-        from libcst import parse_module
 
         result_code = parse_module(code).visit(self._create_transformer()).code
         assert "Path(" in result_code
@@ -517,13 +521,6 @@ class TestOpenToPath(TransformerTestCase):
         self._assert_no_transformation(code)
 
     def test_modify_without_open_returns_false(self):
-        from pathlib import Path
-        from tempfile import TemporaryDirectory
-
-        from libcst import parse_module
-
-        from any_hook._file_data import FileData
-        from any_hook.files_modifiers.open_to_path import OpenToPath
 
         code = "x = 1"
         with TemporaryDirectory() as tmpdir:
@@ -538,13 +535,6 @@ class TestOpenToPath(TransformerTestCase):
             assert modifier.modify([file_data]) is False
 
     def test_modify_with_open_file_processed(self):
-        from pathlib import Path
-        from tempfile import TemporaryDirectory
-
-        from libcst import parse_module
-
-        from any_hook._file_data import FileData
-        from any_hook.files_modifiers.open_to_path import OpenToPath
 
         code = dedent("""
             with open("file.txt") as f:

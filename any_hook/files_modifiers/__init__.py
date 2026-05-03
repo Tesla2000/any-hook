@@ -11,6 +11,7 @@ from any_hook.files_modifiers.field_validator_check import FieldValidatorCheck
 from any_hook.files_modifiers.forbidden_functions import ForbiddenFunctions
 from any_hook.files_modifiers.len_as_bool import LenAsBool
 from any_hook.files_modifiers.local_imports import LocalImports
+from any_hook.files_modifiers.local_imports_to_top import LocalImportsToTop
 from any_hook.files_modifiers.object_to_any import ObjectToAny
 from any_hook.files_modifiers.open_to_path import OpenToPath
 from any_hook.files_modifiers.pydantic_config_to_model_config import (
@@ -33,6 +34,7 @@ _modifier_types: list[type] = [
     PydanticV1ToV2,
     StrEnumInheritance,
     LocalImports,
+    LocalImportsToTop,
     ForbiddenFunctions,
     FieldValidatorCheck,
     UtcNowToDatetimeNow,
@@ -54,6 +56,7 @@ __all__ = [
     "PydanticV1ToV2",
     "StrEnumInheritance",
     "LocalImports",
+    "LocalImportsToTop",
     "ForbiddenFunctions",
     "FieldValidatorCheck",
     "UtcNowToDatetimeNow",
@@ -95,6 +98,7 @@ if TYPE_CHECKING:
             PydanticV1ToV2,
             StrEnumInheritance,
             LocalImports,
+            LocalImportsToTop,
             ForbiddenFunctions,
             FieldValidatorCheck,
             UtcNowToDatetimeNow,

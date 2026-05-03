@@ -878,9 +878,6 @@ class TestPydanticConfigModifyFile:
 
 class TestStripKeywordsEdgeCases:
     def test_strip_keywords_with_no_bases(self):
-        from any_hook.files_modifiers.pydantic_config_to_model_config import (
-            _PydanticConfigToModelConfigTransformer,
-        )
 
         class_def = libcst.ClassDef(
             name=libcst.Name("User"),
@@ -899,9 +896,6 @@ class TestStripKeywordsEdgeCases:
         assert result.bases == []
 
     def test_merge_inline_with_non_call_assign_non_model_config(self):
-        from any_hook.files_modifiers.pydantic_config_to_model_config import (
-            _PydanticConfigToModelConfigTransformer,
-        )
 
         body = [
             libcst.SimpleStatementLine(
@@ -928,9 +922,6 @@ class TestStripKeywordsEdgeCases:
     def test_merge_inline_with_non_call_assign_model_config_no_inline_keys(
         self,
     ):
-        from any_hook.files_modifiers.pydantic_config_to_model_config import (
-            _PydanticConfigToModelConfigTransformer,
-        )
 
         body = [
             libcst.SimpleStatementLine(

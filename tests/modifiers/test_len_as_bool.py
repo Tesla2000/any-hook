@@ -1,7 +1,15 @@
 import re
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from textwrap import dedent
 
-from any_hook.files_modifiers.len_as_bool import _LenAsBoolTransformer
+from libcst import parse_module
+
+from any_hook._file_data import FileData
+from any_hook.files_modifiers.len_as_bool import (
+    LenAsBool,
+    _LenAsBoolTransformer,
+)
 from tests.modifiers._base import TransformerTestCase
 
 
@@ -151,10 +159,6 @@ class TestLenAsBool(TransformerTestCase):
         self._assert_no_transformation(code)
 
     def test_skip_modify_file_without_len(self):
-        from libcst import parse_module
-
-        from any_hook._file_data import FileData
-        from any_hook.files_modifiers.len_as_bool import LenAsBool
 
         modifier = LenAsBool()
         file_data = FileData(
@@ -198,10 +202,6 @@ class TestLenAsBool(TransformerTestCase):
         self._assert_transformation(code, expected)
 
     def test_len_as_bool_modifier_skip_file(self):
-        from libcst import parse_module
-
-        from any_hook._file_data import FileData
-        from any_hook.files_modifiers.len_as_bool import LenAsBool
 
         modifier = LenAsBool()
         file_data = FileData(
@@ -212,13 +212,6 @@ class TestLenAsBool(TransformerTestCase):
         assert modifier._modify_file(file_data) is False
 
     def test_modify_file_with_len_processes(self):
-        from pathlib import Path
-        from tempfile import TemporaryDirectory
-
-        from libcst import parse_module
-
-        from any_hook._file_data import FileData
-        from any_hook.files_modifiers.len_as_bool import LenAsBool
 
         code = "if len(x):\n    pass\n"
         with TemporaryDirectory() as tmpdir:
