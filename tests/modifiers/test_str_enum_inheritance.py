@@ -6,7 +6,10 @@ from textwrap import dedent
 from libcst import parse_module
 
 from any_hook._file_data import FileData
-from any_hook.files_modifiers.str_enum_inheritance import StrEnumInheritance
+from any_hook.files_modifiers.str_enum_inheritance import (
+    StrEnumInheritance,
+    _StrEnumInheritanceTransformer,
+)
 from tests.modifiers._base import TransformerTestCase
 
 
@@ -800,9 +803,6 @@ class TestStrEnumInheritance(TransformerTestCase):
             class Status(StrEnum):
                 ACTIVE = "active"
         """).lstrip()
-        from any_hook.files_modifiers.str_enum_inheritance import (
-            _StrEnumInheritanceTransformer,
-        )
 
         transformer = _StrEnumInheritanceTransformer(
             re.compile(r"#\s*ignore", re.IGNORECASE), convert_to_auto=False
@@ -858,9 +858,6 @@ class TestStrEnumInheritance(TransformerTestCase):
                 ACTIVE = auto()
                 PENDING = auto()
         """).lstrip()
-        from any_hook.files_modifiers.str_enum_inheritance import (
-            _StrEnumInheritanceTransformer,
-        )
 
         transformer = _StrEnumInheritanceTransformer(
             re.compile(r"#\s*ignore", re.IGNORECASE), convert_to_auto=True
@@ -882,9 +879,6 @@ class TestStrEnumInheritance(TransformerTestCase):
                 ACTIVE: str = auto()
                 PENDING: str = auto()
         """).lstrip()
-        from any_hook.files_modifiers.str_enum_inheritance import (
-            _StrEnumInheritanceTransformer,
-        )
 
         transformer = _StrEnumInheritanceTransformer(
             re.compile(r"#\s*ignore", re.IGNORECASE), convert_to_auto=True
@@ -904,9 +898,6 @@ class TestStrEnumInheritance(TransformerTestCase):
             class Status(StrEnum):
                 ACTIVE = "different"
         """).lstrip()
-        from any_hook.files_modifiers.str_enum_inheritance import (
-            _StrEnumInheritanceTransformer,
-        )
 
         transformer = _StrEnumInheritanceTransformer(
             re.compile(r"#\s*ignore", re.IGNORECASE), convert_to_auto=True
@@ -926,9 +917,6 @@ class TestStrEnumInheritance(TransformerTestCase):
             class Status(StrEnum):
                 ACTIVE: str = "different"
         """).lstrip()
-        from any_hook.files_modifiers.str_enum_inheritance import (
-            _StrEnumInheritanceTransformer,
-        )
 
         transformer = _StrEnumInheritanceTransformer(
             re.compile(r"#\s*ignore", re.IGNORECASE), convert_to_auto=True
@@ -948,9 +936,6 @@ class TestStrEnumInheritance(TransformerTestCase):
             class Status(StrEnum):
                 ACTIVE = PENDING = "active"
         """).lstrip()
-        from any_hook.files_modifiers.str_enum_inheritance import (
-            _StrEnumInheritanceTransformer,
-        )
 
         transformer = _StrEnumInheritanceTransformer(
             re.compile(r"#\s*ignore", re.IGNORECASE), convert_to_auto=True
@@ -970,9 +955,6 @@ class TestStrEnumInheritance(TransformerTestCase):
             class Status(StrEnum):
                 obj.x = "active"
         """).lstrip()
-        from any_hook.files_modifiers.str_enum_inheritance import (
-            _StrEnumInheritanceTransformer,
-        )
 
         transformer = _StrEnumInheritanceTransformer(
             re.compile(r"#\s*ignore", re.IGNORECASE), convert_to_auto=True
@@ -992,9 +974,6 @@ class TestStrEnumInheritance(TransformerTestCase):
             class Status(StrEnum):
                 obj.x: str = "active"
         """).lstrip()
-        from any_hook.files_modifiers.str_enum_inheritance import (
-            _StrEnumInheritanceTransformer,
-        )
 
         transformer = _StrEnumInheritanceTransformer(
             re.compile(r"#\s*ignore", re.IGNORECASE), convert_to_auto=True
@@ -1004,9 +983,6 @@ class TestStrEnumInheritance(TransformerTestCase):
         assert result.code == expected
 
     def _create_transformer(self):
-        from any_hook.files_modifiers.str_enum_inheritance import (
-            _StrEnumInheritanceTransformer,
-        )
 
         return _StrEnumInheritanceTransformer(
             re.compile(r"#\s*ignore", re.IGNORECASE)

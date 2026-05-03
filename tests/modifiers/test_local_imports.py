@@ -1,4 +1,5 @@
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from textwrap import dedent
 
 from libcst import parse_module
@@ -124,8 +125,6 @@ class TestLocalImports(TransformerTestCase):
         assert self._check_code(code)
 
     def test_excluded_path_skipped(self):
-        from pathlib import Path
-        from tempfile import TemporaryDirectory
 
         code = dedent("""
             def foo():

@@ -1,8 +1,14 @@
 import re
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from textwrap import dedent
 
+from libcst import parse_module
+
+from any_hook._file_data import FileData
 from any_hook.files_modifiers._import_adder import ModuleImportAdder
 from any_hook.files_modifiers.typing_to_builtin import (
+    TypingToBuiltin,
     _TypingToBuiltinTransformer,
 )
 from tests.modifiers._base import TransformerTestCase
@@ -139,10 +145,6 @@ class TestTypingToBuiltin(TransformerTestCase):
         )
 
     def test_skip_modify_file_without_typing_names(self):
-        from libcst import parse_module
-
-        from any_hook._file_data import FileData
-        from any_hook.files_modifiers.typing_to_builtin import TypingToBuiltin
 
         modifier = TypingToBuiltin()
         file_data = FileData(
@@ -153,13 +155,6 @@ class TestTypingToBuiltin(TransformerTestCase):
         assert modifier._modify_file(file_data) is False
 
     def test_modify_file_with_typing_names_processes(self):
-        from pathlib import Path
-        from tempfile import TemporaryDirectory
-
-        from libcst import parse_module
-
-        from any_hook._file_data import FileData
-        from any_hook.files_modifiers.typing_to_builtin import TypingToBuiltin
 
         code = "from typing import Dict\nx: Dict[str, int]\n"
         with TemporaryDirectory() as tmpdir:

@@ -11,7 +11,14 @@ from any_hook._file_data import FileData
 from any_hook.files_modifiers.generate_stubs import (
     GenerateStubs,
     _build_registry,
+    _get_name,
+    _has_default,
+    _is_pydantic_module,
+    _module_to_str,
     _PydanticStubTransformer,
+    _resolve_import_py,
+    _StubCollector,
+    _unwrap_annotated,
 )
 
 _MODULE = f"{GenerateStubs.__module__}.subprocess.run"
@@ -1010,7 +1017,6 @@ class TestGenerateStubs:
             assert "__init__" in result
 
     def test_fallback_get_name_with_invalid_type(self):
-        from any_hook.files_modifiers.generate_stubs import _get_name
 
         subscript = cst.Subscript(
             value=cst.Name("List"),
@@ -1021,7 +1027,6 @@ class TestGenerateStubs:
         assert _get_name(subscript) == ""
 
     def test_fallback_module_to_str_with_invalid_type(self):
-        from any_hook.files_modifiers.generate_stubs import _module_to_str
 
         subscript = cst.Subscript(
             value=cst.Name("List"),
@@ -1032,7 +1037,6 @@ class TestGenerateStubs:
         assert _module_to_str(subscript) == ""
 
     def test_fallback_is_pydantic_module_with_invalid_type(self):
-        from any_hook.files_modifiers.generate_stubs import _is_pydantic_module
 
         subscript = cst.Subscript(
             value=cst.Name("List"),
@@ -1093,7 +1097,6 @@ class TestGenerateStubs:
         assert "class User(BaseModel): pass" in result
 
     def test_annotated_unwrap_with_simple_metadata(self):
-        from any_hook.files_modifiers.generate_stubs import _unwrap_annotated
 
         ann = cst.Subscript(
             value=cst.Name("Annotated"),
@@ -1109,13 +1112,11 @@ class TestGenerateStubs:
         assert not has_default
 
     def test_has_default_with_non_field_call(self):
-        from any_hook.files_modifiers.generate_stubs import _has_default
 
         call = cst.Call(func=cst.Name("SomeOtherCall"), args=[])
         assert _has_default(call)
 
     def test_is_pydantic_module_with_subscript(self):
-        from any_hook.files_modifiers.generate_stubs import _is_pydantic_module
 
         subscript = cst.Subscript(
             value=cst.Name("pydantic"),
@@ -1126,7 +1127,6 @@ class TestGenerateStubs:
         assert not _is_pydantic_module(subscript)
 
     def test_get_name_with_call_node_in_class_bases(self):
-        from any_hook.files_modifiers.generate_stubs import _get_name
 
         code = "class Foo(get_base()): pass"
         module = cst.parse_module(code)
@@ -1137,20 +1137,17 @@ class TestGenerateStubs:
         assert result == ""
 
     def test_module_to_str_with_call_node(self):
-        from any_hook.files_modifiers.generate_stubs import _module_to_str
 
         call = cst.Call(func=cst.Name("get_module"))
         result = _module_to_str(call)
         assert result == ""
 
     def test_is_pydantic_module_with_call_node(self):
-        from any_hook.files_modifiers.generate_stubs import _is_pydantic_module
 
         call = cst.Call(func=cst.Name("pydantic_factory"))
         assert not _is_pydantic_module(call)
 
     def test_is_pydantic_module_with_subscript_falls_through(self):
-        from any_hook.files_modifiers.generate_stubs import _is_pydantic_module
 
         subscript = cst.Subscript(
             value=cst.Name("pydantic"),
@@ -1161,7 +1158,6 @@ class TestGenerateStubs:
         assert not _is_pydantic_module(subscript)
 
     def test_is_pydantic_module_with_binary_operation(self):
-        from any_hook.files_modifiers.generate_stubs import _is_pydantic_module
 
         binary_op = cst.BinaryOperation(
             left=cst.Name("pydantic"), operator=cst.Add(), right=cst.Name("v1")
@@ -1169,7 +1165,6 @@ class TestGenerateStubs:
         assert not _is_pydantic_module(binary_op)
 
     def test_is_pydantic_module_with_none(self):
-        from any_hook.files_modifiers.generate_stubs import _is_pydantic_module
 
         assert not _is_pydantic_module(None)
 
@@ -1187,18 +1182,11 @@ class TestGenerateStubs:
             assert len(registry) > 0
 
     def test_resolve_import_py_with_empty_module_str(self):
-        from pathlib import Path
-
-        from any_hook.files_modifiers.generate_stubs import _resolve_import_py
 
         result = _resolve_import_py(Path("test.py"), "", 0)
         assert result is None
 
     def test_resolve_import_py_with_relative_empty_module(self):
-        from pathlib import Path
-        from tempfile import TemporaryDirectory
-
-        from any_hook.files_modifiers.generate_stubs import _resolve_import_py
 
         with TemporaryDirectory() as tmpdir:
             pkg_dir = Path(tmpdir) / "mypackage"
@@ -1212,7 +1200,6 @@ class TestGenerateStubs:
             assert result.name == "__init__.py"
 
     def test_unwrap_annotated_with_non_index_slice(self):
-        from any_hook.files_modifiers.generate_stubs import _unwrap_annotated
 
         ann = cst.Subscript(
             value=cst.Name("Annotated"),
@@ -1232,7 +1219,6 @@ class TestGenerateStubs:
         assert not has_default
 
     def test_unwrap_annotated_field_not_index_slice(self):
-        from any_hook.files_modifiers.generate_stubs import _unwrap_annotated
 
         ann = cst.Subscript(
             value=cst.Name("Annotated"),
@@ -1251,7 +1237,6 @@ class TestGenerateStubs:
         assert not has_default
 
     def test_alias_name_is_attribute_skip(self):
-        from any_hook.files_modifiers.generate_stubs import _StubCollector
 
         file_collector = _StubCollector(Path("test.py"))
         attr = cst.Attribute(value=cst.Name("module"), attr=cst.Name("Class"))
@@ -1261,7 +1246,6 @@ class TestGenerateStubs:
         assert len(file_collector.imports) == 0
 
     def test_module_to_str_with_attribute_chain(self):
-        from any_hook.files_modifiers.generate_stubs import _module_to_str
 
         attr = cst.Attribute(
             value=cst.Attribute(value=cst.Name("a"), attr=cst.Name("b")),
@@ -1271,7 +1255,6 @@ class TestGenerateStubs:
         assert result == "a.b.c"
 
     def test_is_pydantic_module_with_attribute_chain(self):
-        from any_hook.files_modifiers.generate_stubs import _is_pydantic_module
 
         attr = cst.Attribute(
             value=cst.Attribute(
@@ -1282,7 +1265,6 @@ class TestGenerateStubs:
         assert _is_pydantic_module(attr)
 
     def test_get_name_with_nested_attribute(self):
-        from any_hook.files_modifiers.generate_stubs import _get_name
 
         attr = cst.Attribute(
             value=cst.Attribute(value=cst.Name("a"), attr=cst.Name("b")),

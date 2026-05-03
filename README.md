@@ -3,7 +3,7 @@
 [![codecov](https://codecov.io/gh/Tesla2000/any-hook/branch/main/graph/badge.svg)](https://codecov.io/gh/Tesla2000/any-hook)
 [![mypy](https://www.mypy-lang.org/static/mypy_badge.svg)](https://mypy-lang.org/)
 [![PyPI version](https://badge.fury.io/py/any-hook.svg)](https://pypi.org/project/any-hook/)
-[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A collection of customizable pre-commit hooks for Python code quality and transformation tasks.
@@ -136,6 +136,52 @@ def foo():
 def bar():
     import sys  # ignore
     return sys.version
+```
+
+### local-imports-to-top
+
+Moves local imports to module level.
+
+**What it does:**
+- Converts imports found inside functions or classes to top-level imports
+- By default, only moves external and standard library imports
+- Keeps project-local (src) imports in their local scopes by default
+- Respects `# ignore` comments to suppress specific imports
+- Deduplicates imports to avoid duplicating existing top-level imports
+
+**Options:**
+- `include_src_imports` (default: `false`) — if `true`, also move relative imports and project-local absolute imports to the top level
+
+**Example — default behavior (external/builtin only):**
+```python
+# Before
+def process():
+    import json
+    from typing import Dict
+    from . import utils
+    return json.dumps({})
+
+# After
+import json
+from typing import Dict
+def process():
+    from . import utils
+    return json.dumps({})
+```
+
+**Example — with include_src_imports=true:**
+```python
+# Before
+def process():
+    import json
+    from . import utils
+    return json.dumps({})
+
+# After
+import json
+from . import utils
+def process():
+    return json.dumps({})
 ```
 
 ### str-enum-inheritance

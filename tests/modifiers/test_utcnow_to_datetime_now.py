@@ -1,10 +1,16 @@
 import re
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from textwrap import dedent
 
 from libcst import parse_module
 
+from any_hook._file_data import FileData
 from any_hook.files_modifiers._import_adder import ModuleImportAdder
-from any_hook.files_modifiers.utcnow_to_datetime_now import _UtcNowTransformer
+from any_hook.files_modifiers.utcnow_to_datetime_now import (
+    UtcNowToDatetimeNow,
+    _UtcNowTransformer,
+)
 from tests.modifiers._base import TransformerTestCase
 
 
@@ -235,12 +241,6 @@ class TestUtcNowToDatetimeNow(TransformerTestCase):
         self._assert_no_transformation(code)
 
     def test_skip_modify_file_without_utcnow(self):
-        from libcst import parse_module
-
-        from any_hook._file_data import FileData
-        from any_hook.files_modifiers.utcnow_to_datetime_now import (
-            UtcNowToDatetimeNow,
-        )
 
         modifier = UtcNowToDatetimeNow()
         file_data = FileData(
@@ -382,15 +382,6 @@ class TestUtcNowToDatetimeNow(TransformerTestCase):
         self._assert_transformation(code, expected)
 
     def test_modify_file_with_utcnow_processes(self):
-        from pathlib import Path
-        from tempfile import TemporaryDirectory
-
-        from libcst import parse_module
-
-        from any_hook._file_data import FileData
-        from any_hook.files_modifiers.utcnow_to_datetime_now import (
-            UtcNowToDatetimeNow,
-        )
 
         code = "from datetime import datetime\nnow = datetime.utcnow()\n"
         with TemporaryDirectory() as tmpdir:
