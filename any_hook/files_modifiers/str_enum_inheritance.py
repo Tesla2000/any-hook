@@ -2,26 +2,29 @@ import enum
 import re
 from typing import Literal
 
+from libcst import (
+    AnnAssign,
+    Arg,
+    Assign,
+    AssignTarget,
+    Call,
+    ClassDef,
+    ImportFrom,
+    ImportStar,
+    Module,
+    Name,
+    SimpleStatementLine,
+    SimpleString,
+)
+from libcst.helpers import get_absolute_module_for_import
+from pydantic import Field
+
 from any_hook._file_data import FileData
 from any_hook.files_modifiers._ignore_aware_transformer import (
     IgnoreAwareTransformer,
 )
 from any_hook.files_modifiers._import_adder import ModuleImportAdder
 from any_hook.files_modifiers.separate_modifier import SeparateModifier
-from libcst import AnnAssign
-from libcst import Arg
-from libcst import Assign
-from libcst import AssignTarget
-from libcst import Call
-from libcst import ClassDef
-from libcst import ImportFrom
-from libcst import ImportStar
-from libcst import Module
-from libcst import Name
-from libcst import SimpleStatementLine
-from libcst import SimpleString
-from libcst.helpers import get_absolute_module_for_import
-from pydantic import Field
 
 
 class _StrEnumInheritanceTransformer(IgnoreAwareTransformer):

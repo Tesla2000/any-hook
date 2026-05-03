@@ -1,5 +1,4 @@
-from abc import ABC
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 
 from pydantic import BaseModel
 
@@ -8,5 +7,4 @@ class Output(BaseModel, ABC):
     type: str
 
     @abstractmethod
-    def process(self, text: str):
-        pass
+    def process(self, text: str) -> str: ...

@@ -1,10 +1,31 @@
 import pathlib
 import re
 from dataclasses import dataclass
-from typing import Any
-from typing import Literal
-from typing import Optional
-from typing import Union
+from typing import Literal, Optional, Sequence, Union
+
+from libcst import (
+    Arg,
+    AsName,
+    Assign,
+    Attribute,
+    BaseExpression,
+    BaseStatement,
+    Call,
+    Expr,
+    FlattenSentinel,
+    ImportFrom,
+    ImportStar,
+    IndentedBlock,
+    Module,
+    Name,
+    RemovalSentinel,
+    SimpleStatementLine,
+    SimpleString,
+    With,
+    WithItem,
+)
+from libcst.helpers import get_absolute_module_for_import
+from pydantic import Field
 
 from any_hook._file_data import FileData
 from any_hook.files_modifiers._ignore_aware_transformer import (
@@ -12,27 +33,6 @@ from any_hook.files_modifiers._ignore_aware_transformer import (
 )
 from any_hook.files_modifiers._import_adder import ModuleImportAdder
 from any_hook.files_modifiers.separate_modifier import SeparateModifier
-from libcst import Arg
-from libcst import AsName
-from libcst import Assign
-from libcst import Attribute
-from libcst import BaseExpression
-from libcst import BaseStatement
-from libcst import Call
-from libcst import Expr
-from libcst import FlattenSentinel
-from libcst import ImportFrom
-from libcst import ImportStar
-from libcst import IndentedBlock
-from libcst import Module
-from libcst import Name
-from libcst import RemovalSentinel
-from libcst import SimpleStatementLine
-from libcst import SimpleString
-from libcst import With
-from libcst import WithItem
-from libcst.helpers import get_absolute_module_for_import
-from pydantic import Field
 
 _READ_MODES = frozenset({"r", "rt", "tr", ""})
 _READ_BYTES_MODES = frozenset({"rb", "br"})
@@ -74,10 +74,17 @@ class _OpenToPathTransformer(IgnoreAwareTransformer):
         )
         return False
 
+    def visit_With(self, node: With) -> bool:
+        self._push_compound_ignore(node)
+        return True
+
     def leave_With(
         self, _: With, updated_node: With
-    ) -> Union[BaseStatement, FlattenSentinel, RemovalSentinel]:
-        if self._is_currently_ignored():
+    ) -> Union[
+        BaseStatement, FlattenSentinel[SimpleStatementLine], RemovalSentinel
+    ]:
+        ignored = self._pop_compound_ignore()
+        if ignored:
             return updated_node
         open_infos = list(map(_parse_open_item, updated_node.items))
         if any(info is None for info in open_infos):
@@ -102,8 +109,6 @@ class _OpenToPathTransformer(IgnoreAwareTransformer):
                 return updated_node
             used_vars.add(var_name)
             new_lines.append(new_line)
-        if used_vars != set(var_to_info):
-            return updated_node
         self._needs_path_import = True
         new_lines[0] = new_lines[0].with_changes(
             leading_lines=updated_node.leading_lines
@@ -133,15 +138,17 @@ def _parse_open_item(item: WithItem) -> Optional[_OpenInfo]:
         return None
     positional = [a for a in call.args if a.keyword is None]
     kwargs = {a.keyword.value: a for a in call.args if a.keyword is not None}
-    if len(positional) > 2:
+    if len(positional) < 1 or len(positional) > 2:
         return None
     path_arg = positional[0].value
-    mode = ""
+    mode: str | bytes = ""
     if len(positional) == 2:
         mode_node = positional[1].value
         if not isinstance(mode_node, SimpleString):
             return None
         mode = mode_node.evaluated_value
+    if isinstance(mode, bytes):
+        mode = mode.decode()
     method_name = _mode_to_method(mode)
     if method_name is None:
         return None
@@ -170,7 +177,9 @@ def _transform_line(
             return None
         info, file_args = result
         new_call = _build_path_call(
-            info.path_arg, info.method_name, file_args + info.extra_kwargs
+            info.path_arg,
+            info.method_name,
+            tuple(file_args) + info.extra_kwargs,
         )
         return (
             line.with_changes(body=[stmt.with_changes(value=new_call)]),
@@ -183,7 +192,9 @@ def _transform_line(
             return None
         info, file_args = result
         new_call = _build_path_call(
-            info.path_arg, info.method_name, file_args + info.extra_kwargs
+            info.path_arg,
+            info.method_name,
+            tuple(file_args) + info.extra_kwargs,
         )
         return (
             line.with_changes(body=[stmt.with_changes(value=new_call)]),
@@ -193,8 +204,8 @@ def _transform_line(
 
 
 def _match_var_call(
-    node: Any, var_to_info: dict[str, _OpenInfo]
-) -> Optional[tuple[_OpenInfo, tuple[Arg, ...]]]:
+    node: object, var_to_info: dict[str, _OpenInfo]
+) -> Optional[tuple[_OpenInfo, Sequence[Arg]]]:
     if not isinstance(node, Call):
         return None
     if not isinstance(node.func, Attribute):

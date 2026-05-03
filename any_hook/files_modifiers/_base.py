@@ -1,16 +1,12 @@
-from abc import ABC
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from collections.abc import Iterable
 from functools import reduce
 from pathlib import Path
 
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
 from any_hook._file_data import FileData
-from any_hook.files_modifiers.output import AnyOutput
-from any_hook.files_modifiers.output import StandardOutput
-from pydantic import BaseModel
-from pydantic import ConfigDict
-from pydantic import Field
-from pydantic import model_validator
+from any_hook.files_modifiers.output import AnyOutput, StandardOutput
 
 
 class Modifier(BaseModel, ABC):

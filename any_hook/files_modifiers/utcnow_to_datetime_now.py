@@ -1,7 +1,21 @@
 import datetime
 import re
-from typing import Any
 from typing import Literal
+
+from libcst import (
+    Arg,
+    Attribute,
+    BaseExpression,
+    Call,
+    ImportFrom,
+    ImportStar,
+    Lambda,
+    Module,
+    Name,
+    Parameters,
+)
+from libcst.helpers import get_absolute_module_for_import
+from pydantic import Field
 
 from any_hook._file_data import FileData
 from any_hook.files_modifiers._ignore_aware_transformer import (
@@ -9,18 +23,6 @@ from any_hook.files_modifiers._ignore_aware_transformer import (
 )
 from any_hook.files_modifiers._import_adder import ModuleImportAdder
 from any_hook.files_modifiers.separate_modifier import SeparateModifier
-from libcst import Arg
-from libcst import Attribute
-from libcst import BaseExpression
-from libcst import Call
-from libcst import ImportFrom
-from libcst import ImportStar
-from libcst import Lambda
-from libcst import Module
-from libcst import Name
-from libcst import Parameters
-from libcst.helpers import get_absolute_module_for_import
-from pydantic import Field
 
 
 class _UtcNowTransformer(IgnoreAwareTransformer):
@@ -121,7 +123,7 @@ class _UtcNowTransformer(IgnoreAwareTransformer):
         return self._import_adder.add(updated_node, datetime.__name__, ["UTC"])
 
     @staticmethod
-    def _is_class_utcnow(node: Any) -> bool:
+    def _is_class_utcnow(node: object) -> bool:
         return (
             isinstance(node, Attribute)
             and isinstance(node.value, Name)
@@ -130,7 +132,7 @@ class _UtcNowTransformer(IgnoreAwareTransformer):
         )
 
     @staticmethod
-    def _is_module_utcnow(node: Any) -> bool:
+    def _is_module_utcnow(node: object) -> bool:
         return (
             isinstance(node, Attribute)
             and isinstance(node.value, Attribute)

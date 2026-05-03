@@ -1,13 +1,12 @@
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Any
 from typing import Literal
 
 import yaml
+from pydantic import BaseModel, Field
+
 from any_hook._file_data import FileData
 from any_hook.files_modifiers._base import Modifier
-from pydantic import BaseModel
-from pydantic import Field
 
 
 class _EnvFileState(BaseModel):
@@ -153,7 +152,7 @@ class WorkflowEnvToExample(Modifier):
             final_content += "\n".join(new_sections_lines)
         self.output_path.write_text(final_content)
 
-    def _extract_env_vars(self, data: Any) -> dict[str, str]:
+    def _extract_env_vars(self, data: object) -> dict[str, str]:
         env_vars: dict[str, str] = {}
         if isinstance(data, dict):
             if "env" in data:

@@ -1,19 +1,16 @@
 import subprocess
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Literal
-from typing import NamedTuple
+from typing import Literal, NamedTuple
 
 import libcst as cst
+from autoimport import fix_code
+from libcst import CSTTransformer, CSTVisitor
+from pydantic import BaseModel, Field, RootModel
+from pydantic_settings import BaseSettings
+
 from any_hook._file_data import FileData
 from any_hook.files_modifiers._base import Modifier
-from autoimport import fix_code
-from libcst import CSTTransformer
-from libcst import CSTVisitor
-from pydantic import BaseModel
-from pydantic import Field
-from pydantic import RootModel
-from pydantic_settings import BaseSettings
 
 _PYDANTIC_BASES = frozenset(
     {BaseModel.__name__, BaseSettings.__name__, RootModel.__name__}
@@ -136,12 +133,12 @@ def _build_registry(
         changed = False
         for stub_file, info in file_infos.items():
             for class_name, bases in info.class_bases.items():
-                key = _ClassKey(stub_file, class_name)
-                if key in pydantic_keys:
+                class_key = _ClassKey(stub_file, class_name)
+                if class_key in pydantic_keys:
                     continue
                 for base in bases:
                     if _ClassKey(stub_file, base) in pydantic_keys:
-                        pydantic_keys.add(key)
+                        pydantic_keys.add(class_key)
                         changed = True
                         break
                     source = info.imports.get(base)
@@ -150,7 +147,7 @@ def _build_registry(
                         and _ClassKey(_file_key(source, output_dir), base)
                         in pydantic_keys
                     ):
-                        pydantic_keys.add(key)
+                        pydantic_keys.add(class_key)
                         changed = True
                         break
 
@@ -165,9 +162,7 @@ def _build_registry(
         if key in seen:
             return []
         seen.add(key)
-        info = file_infos.get(file)
-        if info is None:
-            return []
+        info = file_infos[file]
         parent_fields: list[_FieldEntry] = []
         for base in info.class_bases.get(class_name, []):
             if _ClassKey(file, base) in pydantic_keys:
@@ -185,8 +180,8 @@ def _build_registry(
         seen.discard(key)
         return result
 
-    for key in pydantic_keys:
-        resolve_fields(key.file, key.name, set())
+    for pydantic_key in pydantic_keys:
+        resolve_fields(pydantic_key.file, pydantic_key.name, set())
 
     return registry
 
@@ -358,9 +353,7 @@ def _module_to_str(module: cst.BaseExpression | None) -> str:
     return ""
 
 
-def _is_pydantic_module(module: cst.BaseExpression | None) -> bool:
-    if module is None:
-        return False
+def _is_pydantic_module(module: object) -> bool:
     if isinstance(module, cst.Name):
         return module.value == "pydantic"
     if isinstance(module, cst.Attribute):

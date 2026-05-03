@@ -1,21 +1,25 @@
 import re
 from collections.abc import Iterable
-from typing import Annotated
-from typing import Literal
-from typing import TYPE_CHECKING
-from typing import Union
+from functools import reduce
+from typing import TYPE_CHECKING, Annotated, Literal, TypeGuard
+
+from libcst import (
+    CSTNode,
+    CSTNodeT,
+    CSTTransformer,
+)
+from pydantic import Field
 
 from any_hook._file_data import FileData
 from any_hook.files_modifiers._base import Modifier
 from any_hook.files_modifiers.separate_modifier import SeparateModifier
-from libcst import CSTNode
-from libcst import CSTTransformer
-from libcst import FlattenSentinel
-from libcst import RemovalSentinel
-from pydantic import Field
 
 if TYPE_CHECKING:
     from any_hook.files_modifiers import AnyModifier
+
+
+def _cst_node_type_guard(node: object) -> TypeGuard[CSTNodeT]:
+    return isinstance(node, CSTNode)
 
 
 class _AgitoTransformer(CSTTransformer):
@@ -27,14 +31,17 @@ class _AgitoTransformer(CSTTransformer):
         return any([t.on_visit(node) for t in self._transformers])
 
     def on_leave(
-        self, original_node: CSTNode, updated_node: CSTNode
-    ) -> Union[CSTNode, RemovalSentinel, FlattenSentinel]:
-        result = updated_node
-        for t in self._transformers:
-            if isinstance(result, (RemovalSentinel, FlattenSentinel)):
-                break
-            result = t.on_leave(original_node, result)
-        return result
+        self, original_node: CSTNodeT, updated_node: CSTNodeT
+    ) -> CSTNodeT:
+        def run_leave(node: CSTNodeT, transformer: CSTTransformer) -> CSTNodeT:
+            result: object = transformer.on_leave(original_node, node)
+            if _cst_node_type_guard(result):
+                return result
+            raise ValueError(
+                f"{result=} must be an instance of {CSTNode.__name__}"
+            )
+
+        return reduce(run_leave, self._transformers, updated_node)
 
 
 class Agito(Modifier):

@@ -44,6 +44,16 @@ class TestLenAsBool(TransformerTestCase):
         """).lstrip()
         self._assert_transformation(code, expected)
 
+    def test_inline_if_len(self):
+        code = "if len(x): pass\n"
+        expected = "if x: pass\n"
+        self._assert_transformation(code, expected)
+
+    def test_inline_while_len(self):
+        code = "while len(x): pass\n"
+        expected = "while x: pass\n"
+        self._assert_transformation(code, expected)
+
     def test_elif_len(self):
         code = dedent("""
             if a:
@@ -119,6 +129,108 @@ class TestLenAsBool(TransformerTestCase):
                 pass
         """).lstrip()
         self._assert_transformation(code, expected)
+
+    def test_if_without_len_not_changed(self):
+        code = "if x:\n    pass\n"
+        self._assert_no_transformation(code)
+
+    def test_while_without_len_not_changed(self):
+        code = "while x:\n    pass\n"
+        self._assert_no_transformation(code)
+
+    def test_unary_op_with_plus_not_changed(self):
+        code = "result = +len(x)\n"
+        self._assert_no_transformation(code)
+
+    def test_call_with_non_bool_function_not_changed(self):
+        code = "result = int(len(x))\n"
+        self._assert_no_transformation(code)
+
+    def test_bool_with_multiple_args_not_changed(self):
+        code = "result = bool(len(x), y)\n"
+        self._assert_no_transformation(code)
+
+    def test_skip_modify_file_without_len(self):
+        from libcst import parse_module
+
+        from any_hook._file_data import FileData
+        from any_hook.files_modifiers.len_as_bool import LenAsBool
+
+        modifier = LenAsBool()
+        file_data = FileData(
+            path=None,
+            content="x = 5",
+            module=parse_module("x = 5"),
+        )
+        assert modifier._modify_file(file_data) is False
+
+    def test_if_len_ignored(self):
+        code = dedent("""
+            if len(x):  # ignore
+                pass
+        """).lstrip()
+        self._assert_no_transformation(code)
+
+    def test_while_len_ignored(self):
+        code = dedent("""
+            while len(x):  # ignore
+                pass
+        """).lstrip()
+        self._assert_no_transformation(code)
+
+    def test_not_len_ignored(self):
+        code = "if not len(x):  # ignore\n    pass\n"
+        self._assert_no_transformation(code)
+
+    def test_bool_len_ignored(self):
+        code = "result = bool(len(x))  # ignore\n"
+        self._assert_no_transformation(code)
+
+    def test_nested_len_in_if(self):
+        code = dedent("""
+            if len([len(x) for x in items]):
+                pass
+        """).lstrip()
+        expected = dedent("""
+            if [len(x) for x in items]:
+                pass
+        """).lstrip()
+        self._assert_transformation(code, expected)
+
+    def test_len_as_bool_modifier_skip_file(self):
+        from libcst import parse_module
+
+        from any_hook._file_data import FileData
+        from any_hook.files_modifiers.len_as_bool import LenAsBool
+
+        modifier = LenAsBool()
+        file_data = FileData(
+            path=None,
+            content="x = 5",
+            module=parse_module("x = 5"),
+        )
+        assert modifier._modify_file(file_data) is False
+
+    def test_modify_file_with_len_processes(self):
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+
+        from libcst import parse_module
+
+        from any_hook._file_data import FileData
+        from any_hook.files_modifiers.len_as_bool import LenAsBool
+
+        code = "if len(x):\n    pass\n"
+        with TemporaryDirectory() as tmpdir:
+            test_file = Path(tmpdir) / "test.py"
+            test_file.write_text(code)
+            modifier = LenAsBool()
+            file_data = FileData(
+                path=test_file,
+                content=code,
+                module=parse_module(code),
+            )
+            assert modifier._modify_file(file_data) is True
 
     def _create_transformer(self) -> _LenAsBoolTransformer:
         return _LenAsBoolTransformer(re.compile(r"#\s*ignore", re.IGNORECASE))

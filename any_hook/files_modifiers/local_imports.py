@@ -2,15 +2,18 @@ import re
 from collections.abc import Iterable
 from typing import Literal
 
+from libcst import (
+    ClassDef,
+    CSTVisitor,
+    FunctionDef,
+    Import,
+    ImportFrom,
+    Module,
+    SimpleStatementLine,
+)
+
 from any_hook._file_data import FileData
 from any_hook.files_modifiers._base import Modifier
-from libcst import ClassDef
-from libcst import CSTVisitor
-from libcst import FunctionDef
-from libcst import Import
-from libcst import ImportFrom
-from libcst import Module
-from libcst import SimpleStatementLine
 
 
 class _LocalImportVisitor(CSTVisitor):

@@ -2,9 +2,10 @@ import subprocess
 from collections.abc import Iterable
 from typing import Literal
 
+from pydantic import Field
+
 from any_hook._file_data import FileData
 from any_hook.files_modifiers._base import Modifier
-from pydantic import Field
 
 
 class CheckUntracked(Modifier):

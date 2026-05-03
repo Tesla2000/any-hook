@@ -1,15 +1,14 @@
 import typing
 from pathlib import Path
-from typing import Any
-from unittest import TestCase
+
+from pydantic import BaseModel
 
 from any_hook.files_modifiers import AnyModifier
-from pydantic import BaseModel
 
 _README = Path(__file__).parent.parent / "README.md"
 
 
-def _collect_type_values(hint: Any) -> list[str]:
+def _collect_type_values(hint: object) -> list[str]:
     result = []
     for arg in typing.get_args(hint):
         if typing.get_args(arg):
@@ -19,7 +18,7 @@ def _collect_type_values(hint: Any) -> list[str]:
     return result
 
 
-class TestReadme(TestCase):
+class TestReadme:
     def test_all_modifiers_have_readme_section(self):
         headings = {
             line.lstrip("# ").strip()
@@ -27,4 +26,4 @@ class TestReadme(TestCase):
             if line.startswith("### ")
         }
         for type_value in _collect_type_values(AnyModifier):
-            self.assertIn(type_value, headings)
+            assert type_value in headings
