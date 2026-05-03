@@ -1,7 +1,7 @@
 import pathlib
 import re
 from dataclasses import dataclass
-from typing import Literal, Optional, Union
+from typing import Literal, Optional, Sequence, Union
 
 from libcst import (
     Arg,
@@ -74,18 +74,25 @@ class _OpenToPathTransformer(IgnoreAwareTransformer):
         )
         return False
 
+    def visit_With(self, node: With) -> bool:
+        self._push_compound_ignore(node)
+        return True
+
     def leave_With(
         self, _: With, updated_node: With
-    ) -> Union[BaseStatement, FlattenSentinel, RemovalSentinel]:
-        if self._is_currently_ignored():  # pragma: no cover
-            return updated_node  # pragma: no cover
+    ) -> Union[
+        BaseStatement, FlattenSentinel[SimpleStatementLine], RemovalSentinel
+    ]:
+        ignored = self._pop_compound_ignore()
+        if ignored:
+            return updated_node
         open_infos = list(map(_parse_open_item, updated_node.items))
         if any(info is None for info in open_infos):
             return updated_node
         infos: list[_OpenInfo] = open_infos  # type: ignore[assignment]
         body = updated_node.body
-        if not isinstance(body, IndentedBlock):  # pragma: no cover
-            return updated_node  # pragma: no cover
+        if not isinstance(body, IndentedBlock):
+            return updated_node
         if len(body.body) != len(infos):
             return updated_node
         var_to_info = {info.var_name: info for info in infos}
@@ -98,12 +105,10 @@ class _OpenToPathTransformer(IgnoreAwareTransformer):
             if result is None:
                 return updated_node
             new_line, var_name = result
-            if var_name in used_vars:  # pragma: no cover
-                return updated_node  # pragma: no cover
+            if var_name in used_vars:
+                return updated_node
             used_vars.add(var_name)
             new_lines.append(new_line)
-        if used_vars != set(var_to_info):  # pragma: no cover
-            return updated_node  # pragma: no cover
         self._needs_path_import = True
         new_lines[0] = new_lines[0].with_changes(
             leading_lines=updated_node.leading_lines
@@ -123,25 +128,27 @@ class _OpenToPathTransformer(IgnoreAwareTransformer):
 def _parse_open_item(item: WithItem) -> Optional[_OpenInfo]:
     if item.asname is None or not isinstance(item.asname, AsName):
         return None
-    if not isinstance(item.asname.name, Name):  # pragma: no cover
-        return None  # pragma: no cover
+    if not isinstance(item.asname.name, Name):
+        return None
     var_name = item.asname.name.value
     call = item.item
-    if not isinstance(call, Call):  # pragma: no cover
-        return None  # pragma: no cover
+    if not isinstance(call, Call):
+        return None
     if not isinstance(call.func, Name) or call.func.value != "open":
         return None
     positional = [a for a in call.args if a.keyword is None]
     kwargs = {a.keyword.value: a for a in call.args if a.keyword is not None}
-    if len(positional) > 2:
+    if len(positional) < 1 or len(positional) > 2:
         return None
     path_arg = positional[0].value
-    mode = ""
+    mode: str | bytes = ""
     if len(positional) == 2:
         mode_node = positional[1].value
         if not isinstance(mode_node, SimpleString):
             return None
         mode = mode_node.evaluated_value
+    if isinstance(mode, bytes):
+        mode = mode.decode()
     method_name = _mode_to_method(mode)
     if method_name is None:
         return None
@@ -160,8 +167,8 @@ def _transform_line(
     line: SimpleStatementLine,
     var_to_info: dict[str, _OpenInfo],
 ) -> Optional[tuple[SimpleStatementLine, str]]:
-    if len(line.body) != 1:  # pragma: no cover
-        return None  # pragma: no cover
+    if len(line.body) != 1:
+        return None
     stmt = line.body[0]
     if isinstance(stmt, Expr):
         call = stmt.value
@@ -170,7 +177,9 @@ def _transform_line(
             return None
         info, file_args = result
         new_call = _build_path_call(
-            info.path_arg, info.method_name, file_args + info.extra_kwargs
+            info.path_arg,
+            info.method_name,
+            tuple(file_args) + info.extra_kwargs,
         )
         return (
             line.with_changes(body=[stmt.with_changes(value=new_call)]),
@@ -183,24 +192,26 @@ def _transform_line(
             return None
         info, file_args = result
         new_call = _build_path_call(
-            info.path_arg, info.method_name, file_args + info.extra_kwargs
+            info.path_arg,
+            info.method_name,
+            tuple(file_args) + info.extra_kwargs,
         )
         return (
             line.with_changes(body=[stmt.with_changes(value=new_call)]),
             info.var_name,
         )
-    return None  # pragma: no cover
+    return None
 
 
 def _match_var_call(
     node: object, var_to_info: dict[str, _OpenInfo]
-) -> Optional[tuple[_OpenInfo, tuple[Arg, ...]]]:
-    if not isinstance(node, Call):  # pragma: no cover
-        return None  # pragma: no cover
+) -> Optional[tuple[_OpenInfo, Sequence[Arg]]]:
+    if not isinstance(node, Call):
+        return None
     if not isinstance(node.func, Attribute):
         return None
-    if not isinstance(node.func.value, Name):  # pragma: no cover
-        return None  # pragma: no cover
+    if not isinstance(node.func.value, Name):
+        return None
     var_name = node.func.value.value
     if var_name not in var_to_info:
         return None
@@ -266,6 +277,6 @@ class OpenToPath(SeparateModifier[_OpenToPathTransformer]):
         return _OpenToPathTransformer(ignore_pattern, self.import_adder)
 
     def _modify_file(self, file_data: FileData) -> bool:
-        if "open(" not in file_data.content:  # pragma: no cover
-            return False  # pragma: no cover
+        if "open(" not in file_data.content:
+            return False
         return super()._modify_file(file_data)

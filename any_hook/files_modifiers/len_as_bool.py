@@ -1,5 +1,5 @@
 import re
-from typing import Literal
+from typing import Literal, TypeGuard
 
 from libcst import (
     Arg,
@@ -58,9 +58,8 @@ class _LenAsBoolTransformer(IgnoreAwareTransformer):
             return updated_node
         if not self._is_len_call(updated_node.expression):
             return updated_node
-        return updated_node.with_changes(
-            expression=updated_node.expression.args[0].value
-        )
+        len_call = updated_node.expression
+        return updated_node.with_changes(expression=len_call.args[0].value)
 
     def leave_Call(self, _: Call, updated_node: Call) -> BaseExpression:
         if self._is_currently_ignored():
@@ -73,11 +72,12 @@ class _LenAsBoolTransformer(IgnoreAwareTransformer):
             return updated_node
         if not self._is_len_call(updated_node.args[0].value):
             return updated_node
-        inner_arg = updated_node.args[0].value.args[0].value
+        len_call = updated_node.args[0].value
+        inner_arg = len_call.args[0].value
         return updated_node.with_changes(args=(Arg(value=inner_arg),))
 
     @staticmethod
-    def _is_len_call(node: object) -> bool:
+    def _is_len_call(node: object) -> TypeGuard[Call]:
         return (
             isinstance(node, Call)
             and isinstance(node.func, Name)

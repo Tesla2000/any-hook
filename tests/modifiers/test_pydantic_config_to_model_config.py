@@ -918,8 +918,10 @@ class TestStripKeywordsEdgeCases:
             )
         ]
         inline_args = []
-        result = _PydanticConfigToModelConfigTransformer._merge_inline_args_into_model_config(
-            body, inline_args
+        result = list(
+            _PydanticConfigToModelConfigTransformer._merge_inline_args_into_model_config(
+                body, inline_args
+            )
         )
         assert result == body
 
@@ -945,8 +947,10 @@ class TestStripKeywordsEdgeCases:
             )
         ]
         inline_args = []
-        result = _PydanticConfigToModelConfigTransformer._merge_inline_args_into_model_config(
-            body, inline_args
+        result = list(
+            _PydanticConfigToModelConfigTransformer._merge_inline_args_into_model_config(
+                body, inline_args
+            )
         )
         assert result == body
 
@@ -1015,6 +1019,39 @@ class TestPydanticConfigImportHandling(TransformerTestCase):
                 name: str
         """).lstrip()
         self._assert_no_transformation(code)
+
+    def test_import_star_from_pydantic_with_config_class(self):
+        code = dedent("""
+            from pydantic import *
+            class User:
+                class Config:
+                    frozen = True
+        """).lstrip()
+        expected = dedent("""
+            from typing import ClassVar
+            from pydantic import ConfigDict
+            from pydantic import *
+            class User:
+                model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+        """).lstrip()
+        self._assert_transformation(code, expected)
+
+    def test_import_star_from_typing_with_inline_kwargs(self):
+        code = dedent("""
+            from typing import *
+            from pydantic import BaseModel
+            class User(BaseModel, frozen=True):
+                name: str
+        """).lstrip()
+        expected = dedent("""
+            from typing import ClassVar
+            from typing import *
+            from pydantic import BaseModel, ConfigDict
+            class User(BaseModel):
+                model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+                name: str
+        """).lstrip()
+        self._assert_transformation(code, expected)
 
     def _create_transformer(self) -> _PydanticConfigToModelConfigTransformer:
         return _PydanticConfigToModelConfigTransformer(

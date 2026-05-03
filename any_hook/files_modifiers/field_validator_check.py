@@ -69,17 +69,19 @@ class _FieldValidatorVisitor(CSTVisitor):
 
     @staticmethod
     def _extract_field_names(decorator: Decorator) -> list[str]:
-        names = []
+        names: list[str] = []
+        if not isinstance(decorator.decorator, Call):
+            return names
         for arg in decorator.decorator.args:
             if arg.keyword is not None:
                 continue
             name = _FieldValidatorVisitor._extract_string_value(arg.value)
-            if name:
+            if isinstance(name, str):
                 names.append(name)
         return names
 
     @staticmethod
-    def _extract_string_value(value: object) -> str | None:
+    def _extract_string_value(value: object) -> str | bytes | None:
         if not isinstance(value, SimpleString):
             return None
         return value.evaluated_value

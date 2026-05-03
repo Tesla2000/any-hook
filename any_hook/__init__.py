@@ -3,7 +3,7 @@ from any_hook._file_data import FileData
 
 
 class _Main:
-    def __call__(self):
+    def __call__(self) -> bool:
         return Main().cli_cmd()
 
 

@@ -42,6 +42,19 @@ repos:
              "--extra-sys-path=.venv/lib/python3.12/site-packages,.",
           ]
         stages: [ pre-commit ]
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.20.1
+    hooks:
+      - id: mypy
+        exclude: (^tests/|\.pyi$)
+        additional_dependencies:
+           - pydantic
+           - pydantic-settings
+           - libcst
+           - types-PyYAML
+           - autoimport
+           - subclass_getter
+        args: [ --strict, --config-file, pyproject.toml]
   - repo: https://github.com/Tesla2000/any-hook
     rev: v3.2.0
     hooks:

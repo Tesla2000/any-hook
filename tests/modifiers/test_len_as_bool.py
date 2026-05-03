@@ -44,6 +44,16 @@ class TestLenAsBool(TransformerTestCase):
         """).lstrip()
         self._assert_transformation(code, expected)
 
+    def test_inline_if_len(self):
+        code = "if len(x): pass\n"
+        expected = "if x: pass\n"
+        self._assert_transformation(code, expected)
+
+    def test_inline_while_len(self):
+        code = "while len(x): pass\n"
+        expected = "while x: pass\n"
+        self._assert_transformation(code, expected)
+
     def test_elif_len(self):
         code = dedent("""
             if a:

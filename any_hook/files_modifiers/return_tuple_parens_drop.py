@@ -39,9 +39,12 @@ class _ReturnTupleParensDropTransformer(IgnoreAwareTransformer):
 
     @staticmethod
     def _is_single_line(node: Tuple) -> bool:
-        for paren in node.lpar:
-            if isinstance(paren.whitespace_after, ParenthesizedWhitespace):
-                return False
+
+        if any(
+            isinstance(paren.whitespace_after, ParenthesizedWhitespace)
+            for paren in node.lpar
+        ):
+            return False
         for element in node.elements:
             if isinstance(element, Element) and isinstance(
                 element.comma, Comma
@@ -50,11 +53,12 @@ class _ReturnTupleParensDropTransformer(IgnoreAwareTransformer):
                     element.comma.whitespace_after, ParenthesizedWhitespace
                 ):
                     return False
-        for paren in node.rpar:
-            if isinstance(paren, RightParen) and isinstance(
-                paren.whitespace_before, ParenthesizedWhitespace
-            ):
-                return False
+        if any(
+            isinstance(paren, RightParen)
+            and isinstance(paren.whitespace_before, ParenthesizedWhitespace)
+            for paren in node.rpar
+        ):
+            return False
         return True
 
 

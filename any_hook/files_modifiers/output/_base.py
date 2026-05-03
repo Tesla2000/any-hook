@@ -7,5 +7,4 @@ class Output(BaseModel, ABC):
     type: str
 
     @abstractmethod
-    def process(self, text: str):  # pragma: no cover
-        ...
+    def process(self, text: str) -> str: ...

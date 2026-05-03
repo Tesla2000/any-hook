@@ -1,4 +1,5 @@
-from typing import Annotated, Union
+import logging
+from typing import TYPE_CHECKING, Annotated, Union
 
 from pydantic import Field
 
@@ -24,26 +25,24 @@ from any_hook.files_modifiers.str_enum_inheritance import StrEnumInheritance
 from any_hook.files_modifiers.typing_to_builtin import TypingToBuiltin
 from any_hook.files_modifiers.utcnow_to_datetime_now import UtcNowToDatetimeNow
 
-AnyModifier = Annotated[
-    Union[
-        AnyToObject,
-        ObjectToAny,
-        PydanticConfigToModelConfig,
-        PydanticV1ToV2,
-        StrEnumInheritance,
-        LocalImports,
-        ForbiddenFunctions,
-        FieldValidatorCheck,
-        UtcNowToDatetimeNow,
-        LenAsBool,
-        TypingToBuiltin,
-        ReturnTupleParensDrop,
-        RemoveFPrefix,
-        OpenToPath,
-        CheckUntracked,
-        Agito,
-    ],
-    Field(discriminator="type"),
+_logger = logging.getLogger(__name__)
+_modifier_types: list[type] = [
+    AnyToObject,
+    ObjectToAny,
+    PydanticConfigToModelConfig,
+    PydanticV1ToV2,
+    StrEnumInheritance,
+    LocalImports,
+    ForbiddenFunctions,
+    FieldValidatorCheck,
+    UtcNowToDatetimeNow,
+    LenAsBool,
+    TypingToBuiltin,
+    ReturnTupleParensDrop,
+    RemoveFPrefix,
+    OpenToPath,
+    CheckUntracked,
+    Agito,
 ]
 __all__ = [
     "Modifier",
@@ -70,25 +69,50 @@ try:
         WorkflowEnvToExample,
     )
 
-    AnyModifier = Annotated[
-        Union[AnyModifier, WorkflowEnvToExample], Field(discriminator="type")
-    ]
+    _modifier_types.append(WorkflowEnvToExample)
     __all__.append("WorkflowEnvToExample")
 except ImportError as e:  # pragma: no cover
-    print(  # pragma: no cover
+    _logger.warning(
         "Package necessary to use workflow-env-to-example is not installed, "
         f"workflow-env-to-example is disabled.\n{e}"
     )
 try:
     from any_hook.files_modifiers.generate_stubs import GenerateStubs
 
-    AnyModifier = Annotated[
-        Union[AnyModifier, GenerateStubs], Field(discriminator="type")
-    ]
+    _modifier_types.append(GenerateStubs)
     __all__.append("GenerateStubs")
 except ImportError as e:  # pragma: no cover
-    print(  # pragma: no cover
+    _logger.warning(
         "Package necessary to use generate-stubs is not installed, "
         f"generate-stubs is disabled.\n{e}"
     )
+if TYPE_CHECKING:
+    AnyModifier = Annotated[
+        Union[
+            AnyToObject,
+            ObjectToAny,
+            PydanticConfigToModelConfig,
+            PydanticV1ToV2,
+            StrEnumInheritance,
+            LocalImports,
+            ForbiddenFunctions,
+            FieldValidatorCheck,
+            UtcNowToDatetimeNow,
+            LenAsBool,
+            TypingToBuiltin,
+            ReturnTupleParensDrop,
+            RemoveFPrefix,
+            OpenToPath,
+            CheckUntracked,
+            Agito,
+            WorkflowEnvToExample,
+            GenerateStubs,
+        ],
+        Field(discriminator="type"),
+    ]
+else:
+    AnyModifier = Annotated[
+        Union.__getitem__(tuple(_modifier_types)),
+        Field(discriminator="type"),
+    ]
 Agito.model_rebuild(_types_namespace={"AnyModifier": AnyModifier})

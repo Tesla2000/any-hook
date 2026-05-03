@@ -87,6 +87,23 @@ class TestAgitoTransformer(TransformerTestCase):
         code = "x = 1\n"
         self._assert_no_transformation(code)
 
+    def test_transformer_returning_removal_sentinel_raises_error(self):
+        import libcst
+        import pytest
+
+        class BadTransformer(libcst.CSTTransformer):
+            def on_leave(self, original_node, updated_node):
+                # Return RemovalSentinel for Name nodes
+                if isinstance(updated_node, libcst.Name):
+                    return libcst.RemovalSentinel.REMOVE
+                return updated_node
+
+        code = "x = 1\n"
+        module = libcst.parse_module(code)
+        agito = _AgitoTransformer((BadTransformer(),))
+        with pytest.raises(ValueError, match="must be an instance of CSTNode"):
+            module.visit(agito)
+
     def _create_transformer(self) -> _AgitoTransformer:
         return _AgitoTransformer(_make_transformers())
 

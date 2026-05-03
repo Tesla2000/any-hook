@@ -114,8 +114,8 @@ class _AnyToObjectTransformer(IgnoreAwareTransformer):
 
     @staticmethod
     def _remove_any_alias(node: SmallStatementType) -> SmallStatementType:
-        if not isinstance(node, ImportFrom):  # pragma: no cover
-            return node  # pragma: no cover
+        if not isinstance(node, ImportFrom):
+            return node
         module = get_absolute_module_for_import(None, node)
         if module != typing.__name__:
             return node
@@ -126,7 +126,7 @@ class _AnyToObjectTransformer(IgnoreAwareTransformer):
             alias for alias in names if alias.name.value != Any.__name__
         ]
         if len(remaining) == len(names):
-            return node  # pragma: no cover
+            return node
         return node.with_changes(names=remaining)
 
 

@@ -521,6 +521,17 @@ class TestPydanticV1ToV2(TransformerTestCase):
             # and the transformation changes the code
             assert modifier._modify_file(file_data) is True
 
+    def test_get_module_parts_with_invalid_attribute_value(self):
+        import libcst
+
+        transformer = self._create_transformer()
+        # Create an Attribute with an invalid value type (not Name or Attribute)
+        bad_attr = libcst.Attribute(
+            value=libcst.Integer("123"), attr=libcst.Name("x")
+        )
+        result = transformer._get_module_parts(bad_attr)
+        assert result == []
+
     def _create_transformer(self) -> _PydanticV1ToV2Transformer:
         return _PydanticV1ToV2Transformer(
             re.compile(r"#\s*ignore", re.IGNORECASE)

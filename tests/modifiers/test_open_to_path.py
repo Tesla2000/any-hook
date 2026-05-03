@@ -561,6 +561,145 @@ class TestOpenToPath(TransformerTestCase):
             )
             assert modifier.modify([file_data]) is True
 
+    def test_open_with_ignore_comment_on_with_header_not_changed(self):
+        code = dedent("""
+            with open("file.txt") as f:  # ignore
+                content = f.read()
+        """).lstrip()
+        self._assert_no_transformation(code)
+
+    def test_open_with_simple_statement_body_not_changed(self):
+        code = "with open('file.txt') as f: x = f.read()\n"
+        self._assert_no_transformation(code)
+
+    def test_open_with_non_simple_statement_line_not_changed(self):
+        code = dedent("""
+            with open("file.txt") as f:
+                if len(f.read()) > 0:
+                    pass
+        """).lstrip()
+        self._assert_no_transformation(code)
+
+    def test_open_with_var_used_twice_not_changed(self):
+        code = dedent("""
+            with open("file.txt") as f:
+                content = f.read()
+                content2 = f.read()
+        """).lstrip()
+        self._assert_no_transformation(code)
+
+    def test_open_with_non_open_call_not_changed(self):
+        code = dedent("""
+            with pathlib.Path("file.txt") as f:
+                content = f.read()
+        """).lstrip()
+        self._assert_no_transformation(code)
+
+    def test_open_as_none_ignored(self):
+        code = dedent("""
+            with open("file.txt"):
+                pass
+        """).lstrip()
+        self._assert_no_transformation(code)
+
+    def test_open_with_attribute_call_as_func_not_changed(self):
+        code = dedent("""
+            with obj.open("file.txt") as f:
+                content = f.read()
+        """).lstrip()
+        self._assert_no_transformation(code)
+
+    def test_open_with_non_name_func_not_changed(self):
+        code = dedent("""
+            with get_open()("file.txt") as f:
+                content = f.read()
+        """).lstrip()
+        self._assert_no_transformation(code)
+
+    def test_open_with_no_positional_args_not_changed(self):
+        code = dedent("""
+            with open(mode="r") as f:
+                content = f.read()
+        """).lstrip()
+        self._assert_no_transformation(code)
+
+    def test_open_mode_as_bytes_literal(self):
+        code = dedent("""
+            with open("file.bin", b"rb") as f:
+                data = f.read()
+        """).lstrip()
+        expected = dedent("""
+            from pathlib import Path
+            data = Path("file.bin").read_bytes()
+        """).lstrip()
+        self._assert_transformation(code, expected)
+
+    def test_open_body_with_multiple_statements_not_changed(self):
+        code = dedent("""
+            with open("file.txt") as f:
+                x = f.read()
+                y = f.read()
+        """).lstrip()
+        self._assert_no_transformation(code)
+
+    def test_open_variable_used_in_two_statements_not_changed(self):
+        code = dedent("""
+            with open("file.txt") as f1, open("file.txt") as f2:
+                x = f1.read()
+                y = f1.read()
+        """).lstrip()
+        self._assert_no_transformation(code)
+
+    def test_open_not_all_variables_used_in_statements_not_changed(self):
+        code = dedent("""
+            with open("file1.txt") as f1, open("file2.txt") as f2:
+                x = f1.read()
+                y = f1.read()
+        """).lstrip()
+        self._assert_no_transformation(code)
+
+    def test_open_single_statement_with_multiple_expressions(self):
+        code = dedent("""
+            with open("file.txt") as f:
+                x = 1; y = f.read()
+        """).lstrip()
+        self._assert_no_transformation(code)
+
+    def test_open_body_statement_with_multiple_body_items(self):
+        code = "with open('file.txt') as f: x = 1; y = f.read()\n"
+        self._assert_no_transformation(code)
+
+    def test_open_with_non_name_func_value_not_changed(self):
+        code = dedent("""
+            with open("file.txt") as f:
+                x = obj.f.read()
+        """).lstrip()
+        self._assert_no_transformation(code)
+
+    def test_open_with_neither_expr_nor_assign_not_changed(self):
+        code = dedent("""
+            with open("file.txt") as f:
+                assert f.read() == ""
+        """).lstrip()
+        self._assert_no_transformation(code)
+
+    def test_open_mixed_with_context_manager_variable_not_changed(self):
+        code = dedent("""
+            ctx = contextlib.nullcontext()
+            with ctx as c, open("file.txt") as f:
+                x = f.read()
+                y = c
+        """).lstrip()
+        self._assert_no_transformation(code)
+
+    def test_open_multiple_opens_but_not_all_used_not_changed(self):
+        code = dedent("""
+            with open("file1.txt") as f1, open("file2.txt") as f2:
+                x = f1.read()
+                y = 1
+        """).lstrip()
+        self._assert_no_transformation(code)
+
     def _create_transformer(self) -> _OpenToPathTransformer:
         return _OpenToPathTransformer(
             re.compile(r"#\s*ignore", re.IGNORECASE), ModuleImportAdder()

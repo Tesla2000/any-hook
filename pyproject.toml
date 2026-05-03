@@ -50,6 +50,12 @@ skip_covered = true
 profile = "black"
 line_length = 79
 
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
+mypy_path = "stubs"
+
 [project.scripts]
 any-hook = "any_hook:main"
 

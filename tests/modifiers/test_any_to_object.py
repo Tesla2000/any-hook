@@ -220,6 +220,67 @@ class TestAnyToObject(TransformerTestCase):
         )
         assert modifier._modify_file(file_data) is False
 
+    def test_non_import_from_statement_in_filter_preserved(self):
+        code = dedent("""
+            from typing import Any
+            def foo():
+                pass
+            x: Any = 5
+        """).lstrip()
+        expected = dedent("""
+            def foo():
+                pass
+            x: object = 5
+        """).lstrip()
+        self._assert_transformation(code, expected)
+
+    def test_import_with_any_and_other_not_changed_when_no_any_used(self):
+        code = dedent("""
+            from typing import Any, List
+            x: List[int] = []
+        """).lstrip()
+        self._assert_no_transformation(code)
+
+    def test_import_any_with_other_imports_in_same_line(self):
+        code = dedent("""
+            from typing import Any, List; from os import path
+            x: List[Any] = []
+        """).lstrip()
+        expected = dedent("""
+            from typing import List; from os import path
+            x: List[object] = []
+        """).lstrip()
+        self._assert_transformation(code, expected)
+
+    def test_import_list_unchanged_when_any_not_present(self):
+        code = dedent("""
+            from typing import List, Dict
+            x: List[Dict[str, int]] = {}
+        """).lstrip()
+        self._assert_no_transformation(code)
+
+    def test_import_with_non_import_statement_in_same_line(self):
+        code = "from typing import List; print(1)\n"
+        self._assert_no_transformation(code)
+
+    def test_import_any_partially_with_other_in_same_line(self):
+        code = "from typing import Any, List; x: Any = 5\n"
+        expected = "from typing import List; x: object = 5\n"
+        self._assert_transformation(code, expected)
+
+    def test_multiple_imports_with_any_and_list_only(self):
+        code = dedent("""
+            from typing import Any, List
+            from typing import Dict
+            x: Any = []
+        """).lstrip()
+        expected = dedent("""
+            from typing import List
+            from typing import Dict
+            x: object = []
+        """).lstrip()
+        self._assert_transformation(code, expected)
+
     def _create_transformer(self) -> _AnyToObjectTransformer:
         return _AnyToObjectTransformer(
             re.compile(r"#\s*ignore", re.IGNORECASE)

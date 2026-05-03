@@ -1,7 +1,12 @@
 import re
 from typing import Literal, Union
 
-from libcst import FormattedString, FormattedStringExpression, SimpleString
+from libcst import (
+    FormattedString,
+    FormattedStringExpression,
+    FormattedStringText,
+    SimpleString,
+)
 
 from any_hook._file_data import FileData
 from any_hook.files_modifiers._ignore_aware_transformer import (
@@ -25,7 +30,7 @@ class _RemoveFPrefixTransformer(IgnoreAwareTransformer):
         text = "".join(
             part.value
             for part in updated_node.parts
-            if not isinstance(part, FormattedStringExpression)
+            if isinstance(part, FormattedStringText)
         )
         return SimpleString(f"{quote}{text}{quote}")
 

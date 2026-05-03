@@ -133,12 +133,12 @@ def _build_registry(
         changed = False
         for stub_file, info in file_infos.items():
             for class_name, bases in info.class_bases.items():
-                key = _ClassKey(stub_file, class_name)
-                if key in pydantic_keys:
+                class_key = _ClassKey(stub_file, class_name)
+                if class_key in pydantic_keys:
                     continue
                 for base in bases:
                     if _ClassKey(stub_file, base) in pydantic_keys:
-                        pydantic_keys.add(key)
+                        pydantic_keys.add(class_key)
                         changed = True
                         break
                     source = info.imports.get(base)
@@ -147,7 +147,7 @@ def _build_registry(
                         and _ClassKey(_file_key(source, output_dir), base)
                         in pydantic_keys
                     ):
-                        pydantic_keys.add(key)
+                        pydantic_keys.add(class_key)
                         changed = True
                         break
 
@@ -180,8 +180,8 @@ def _build_registry(
         seen.discard(key)
         return result
 
-    for key in pydantic_keys:
-        resolve_fields(key.file, key.name, set())
+    for pydantic_key in pydantic_keys:
+        resolve_fields(pydantic_key.file, pydantic_key.name, set())
 
     return registry
 

@@ -1,5 +1,11 @@
 # any-hook
 
+[![codecov](https://codecov.io/gh/Tesla2000/any-hook/branch/main/graph/badge.svg)](https://codecov.io/gh/Tesla2000/any-hook)
+[![mypy](https://www.mypy-lang.org/static/mypy_badge.svg)](https://mypy-lang.org/)
+[![PyPI version](https://badge.fury.io/py/any-hook.svg)](https://pypi.org/project/any-hook/)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 A collection of customizable pre-commit hooks for Python code quality and transformation tasks.
 
 ## Description

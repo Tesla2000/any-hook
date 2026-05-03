@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
-from typing import Annotated, ClassVar, Optional, Union
+from typing import TYPE_CHECKING, Annotated, ClassVar, Optional, Union
 
 import libcst
 from pydantic import Field, TypeAdapter, field_validator
@@ -36,39 +36,42 @@ class Main(BaseSettings):
     @field_validator("external_modifiers_path")
     @classmethod
     def _get_external_modifiers(cls, path: Optional[Path]) -> Optional[Path]:
-        if path is None:
+        if TYPE_CHECKING:
             return path
-        if not path.exists():
-            raise ValueError(f"{path=} doesn't exist")
-        if path == cls._loaded_external_path:
+        else:
+            if path is None:
+                return path
+            if not path.exists():
+                raise ValueError(f"{path=} doesn't exist")
+            if path == cls._loaded_external_path:
+                return path
+            spec = importlib.util.spec_from_file_location(
+                "_external_module", str(path)
+            )
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            cls._loaded_external_path = path
+            extended_union = Annotated[
+                Union.__getitem__(
+                    tuple(
+                        class_
+                        for class_ in get_subclasses(Modifier)
+                        if "type" in class_.model_fields
+                    )
+                ),
+                Field(discriminator="type"),
+            ]
+            new_annotation = Annotated[
+                tuple[extended_union, ...], Field(min_length=1)
+            ]
+            Agito.model_fields["modifiers"].annotation = new_annotation
+            Agito.model_rebuild(force=True)
+            cls._modifiers_adapter = TypeAdapter(new_annotation)
             return path
-        spec = importlib.util.spec_from_file_location(
-            "_external_module", str(path)
-        )
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        cls._loaded_external_path = path
-        extended_union = Annotated[
-            Union.__getitem__(
-                tuple(
-                    class_
-                    for class_ in get_subclasses(Modifier)
-                    if "type" in class_.model_fields
-                )
-            ),
-            Field(discriminator="type"),
-        ]
-        new_annotation = Annotated[
-            tuple[extended_union, ...], Field(min_length=1)
-        ]
-        Agito.model_fields["modifiers"].annotation = new_annotation
-        Agito.model_rebuild(force=True)
-        cls._modifiers_adapter = TypeAdapter(new_annotation)
-        return path
 
     @field_validator("modifiers", mode="plain")
     @classmethod
-    def _validate_modifiers(cls, data: object) -> list[AnyModifier]:
+    def _validate_modifiers(cls, data: object) -> tuple[AnyModifier, ...]:
         return cls._modifiers_adapter.validate_python(data)
 
     def cli_cmd(self) -> bool:

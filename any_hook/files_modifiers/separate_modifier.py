@@ -34,5 +34,4 @@ class SeparateModifier(Modifier, ABC, Generic[TransformerType]):
     @abstractmethod
     def create_transformer(
         self, ignore_pattern: re.Pattern[str]
-    ) -> TransformerType:  # pragma: no cover
-        ...
+    ) -> TransformerType: ...

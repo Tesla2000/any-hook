@@ -1,5 +1,5 @@
 import re
-from typing import ClassVar, Literal
+from typing import Iterable, Literal
 
 import pydantic
 from libcst import (
@@ -11,7 +11,9 @@ from libcst import (
     Call,
     ClassDef,
     Comma,
+    CSTNode,
     ImportFrom,
+    ImportStar,
     IndentedBlock,
     Index,
     MaybeSentinel,
@@ -65,7 +67,7 @@ class _PydanticConfigToModelConfigTransformer(IgnoreAwareTransformer):
         if not isinstance(updated_node.body, IndentedBlock):
             return updated_node
         inline_args = list(updated_node.keywords)
-        new_body = []
+        new_body: list[CSTNode] = []
         has_model_config = False
         config_class_inserted = False
         for statement in updated_node.body.body:
@@ -112,8 +114,10 @@ class _PydanticConfigToModelConfigTransformer(IgnoreAwareTransformer):
             new_body.append(statement)
         result = updated_node
         if inline_args and has_model_config and not config_class_inserted:
-            new_body = self._merge_inline_args_into_model_config(
-                new_body, inline_args
+            new_body = list(
+                self._merge_inline_args_into_model_config(
+                    new_body, inline_args
+                )
             )
             result = self._strip_keywords(updated_node)
             self._made_changes = True
@@ -172,16 +176,15 @@ class _PydanticConfigToModelConfigTransformer(IgnoreAwareTransformer):
 
     @classmethod
     def _merge_inline_args_into_model_config(
-        cls, body: list, inline_args: list[Arg]
-    ) -> list:
+        cls, body: Iterable[CSTNode], inline_args: list[Arg]
+    ) -> Iterable[CSTNode]:
         inline_keys = {arg.keyword.value for arg in inline_args if arg.keyword}
-        new_body = []
         for statement in body:
             if not (
                 isinstance(statement, SimpleStatementLine)
                 and len(statement.body) == 1
             ):
-                new_body.append(statement)
+                yield statement
                 continue
             body_item = statement.body[0]
             if (
@@ -190,7 +193,7 @@ class _PydanticConfigToModelConfigTransformer(IgnoreAwareTransformer):
                 and body_item.target.value == "model_config"
             ):
                 if not isinstance(body_item.value, Call):
-                    new_body.append(statement)
+                    yield statement
                     continue
                 existing_keys = {
                     arg.keyword.value
@@ -204,10 +207,8 @@ class _PydanticConfigToModelConfigTransformer(IgnoreAwareTransformer):
                 updated_value = cls._add_args_to_call(
                     body_item.value, inline_args
                 )
-                new_body.append(
-                    statement.with_changes(
-                        body=[body_item.with_changes(value=updated_value)]
-                    )
+                yield statement.with_changes(
+                    body=[body_item.with_changes(value=updated_value)]
                 )
                 continue
             if isinstance(body_item, Assign):
@@ -222,7 +223,7 @@ class _PydanticConfigToModelConfigTransformer(IgnoreAwareTransformer):
                             raise ValueError(
                                 f"Conflicting model_config keys defined in both inline class kwargs and model_config: {inline_keys}"
                             )
-                        new_body.append(statement)
+                        yield statement
                         continue
                     existing_keys = {
                         arg.keyword.value
@@ -240,7 +241,7 @@ class _PydanticConfigToModelConfigTransformer(IgnoreAwareTransformer):
                         target=Name("model_config"),
                         annotation=Annotation(
                             annotation=Subscript(
-                                value=Name(ClassVar.__name__),
+                                value=Name("ClassVar"),
                                 slice=[
                                     SubscriptElement(
                                         slice=Index(
@@ -252,10 +253,9 @@ class _PydanticConfigToModelConfigTransformer(IgnoreAwareTransformer):
                         ),
                         value=updated_value,
                     )
-                    new_body.append(statement.with_changes(body=[upgraded]))
+                    yield statement.with_changes(body=[upgraded])
                     continue
-            new_body.append(statement)
-        return new_body
+            yield statement
 
     @staticmethod
     def _add_args_to_call(call: Call, new_args: list[Arg]) -> Call:
@@ -272,7 +272,7 @@ class _PydanticConfigToModelConfigTransformer(IgnoreAwareTransformer):
             target=Name("model_config"),
             annotation=Annotation(
                 annotation=Subscript(
-                    value=Name(ClassVar.__name__),
+                    value=Name("ClassVar"),
                     slice=[
                         SubscriptElement(
                             slice=Index(value=Name(ConfigDict.__name__))
@@ -289,14 +289,15 @@ class _PydanticConfigToModelConfigTransformer(IgnoreAwareTransformer):
     def visit_ImportFrom(self, node: ImportFrom) -> bool:
         if not node.module or not isinstance(node.module, Name):
             return False
-        if node.module.value == pydantic.__name__:
-            for alias in node.names:
-                if alias.name.value == ConfigDict.__name__:
-                    self._has_config_dict_import = True
-        if node.module.value == "typing":
-            for alias in node.names:
-                if alias.name.value == ClassVar.__name__:
-                    self._has_class_var_import = True
+        if not isinstance(node.names, ImportStar):
+            if node.module.value == pydantic.__name__:
+                for alias in node.names:
+                    if alias.name.value == ConfigDict.__name__:
+                        self._has_config_dict_import = True
+            if node.module.value == "typing":
+                for alias in node.names:
+                    if alias.name.value == "ClassVar":
+                        self._has_class_var_import = True
         return False
 
     def leave_Module(self, _: Module, updated_node: Module) -> Module:
@@ -308,7 +309,7 @@ class _PydanticConfigToModelConfigTransformer(IgnoreAwareTransformer):
             )
         if not self._has_class_var_import:
             updated_node = self._import_adder.add(
-                updated_node, "typing", [ClassVar.__name__]
+                updated_node, "typing", ["ClassVar"]
             )
         return updated_node
 

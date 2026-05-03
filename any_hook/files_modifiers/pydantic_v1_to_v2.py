@@ -42,6 +42,7 @@ class _PydanticV1ToV2Transformer(IgnoreAwareTransformer):
             return updated_node
         new_names = []
         made_change = False
+        new_name: Name | Attribute
         for original_alias, updated_alias in zip(
             original.names, updated_node.names
         ):
@@ -70,28 +71,31 @@ class _PydanticV1ToV2Transformer(IgnoreAwareTransformer):
     ) -> Attribute:
         if self._is_currently_ignored():
             return updated_node
-        if not isinstance(updated_node.value, Name):
+        if not isinstance(updated_node.value, Attribute):
             return updated_node
-        if (
-            updated_node.value.value == "pydantic"
-            and updated_node.attr.value == "v1"
-        ):
+        inner = updated_node.value
+        if not isinstance(inner.value, Name):
+            return updated_node
+        if inner.value.value == "pydantic" and inner.attr.value == "v1":
             self._made_changes = True
-            return updated_node.value
+            return updated_node.with_changes(value=inner.value)
         return updated_node
 
     def _get_module_parts(self, node: Name | Attribute) -> list[str]:
         if isinstance(node, Name):
             return [node.value]
+        if not isinstance(node.value, (Name, Attribute)):
+            return []
         parts = self._get_module_parts(node.value)
         parts.append(node.attr.value)
         return parts
 
+    @staticmethod
     def _build_module_name(
-        self, parts: Annotated[list[str], Field(min_length=2)]
+        parts: Annotated[list[str], Field(min_length=2)],
     ) -> Attribute:
-        base = Name(parts[0])
-        for part in parts[1:]:
+        base = Attribute(value=Name(parts[0]), attr=Name(parts[1]), dot=Dot())
+        for part in parts[2:]:
             base = Attribute(value=base, attr=Name(part), dot=Dot())
         return base
 

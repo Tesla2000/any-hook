@@ -260,6 +260,20 @@ class TestFieldValidatorCheck(TransformerTestCase):
         )
         assert not modifier.modify([file_data])
 
+    def test_extract_field_names_with_non_call_decorator(self):
+        code = dedent("""
+            class Model:
+                @field_validator
+                @classmethod
+                def validate_name(cls, v):
+                    return v.strip()
+        """).lstrip()
+        module = parse_module(code)
+        func_def = module.body[0].body.body[0]
+        decorator = func_def.decorators[0]
+        field_names = _FieldValidatorVisitor._extract_field_names(decorator)
+        assert field_names == []
+
     def _check(self, code: str) -> bool:
         file_data = FileData(
             path=Path("test.py"), content=code, module=parse_module(code)
