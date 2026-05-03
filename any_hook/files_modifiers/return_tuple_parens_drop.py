@@ -1,17 +1,20 @@
 import re
 from typing import Literal
 
+from libcst import (
+    Comma,
+    Element,
+    ParenthesizedWhitespace,
+    Return,
+    RightParen,
+    Tuple,
+)
+
 from any_hook._file_data import FileData
 from any_hook.files_modifiers._ignore_aware_transformer import (
     IgnoreAwareTransformer,
 )
 from any_hook.files_modifiers.separate_modifier import SeparateModifier
-from libcst import Comma
-from libcst import Element
-from libcst import ParenthesizedWhitespace
-from libcst import Return
-from libcst import RightParen
-from libcst import Tuple
 
 
 class _ReturnTupleParensDropTransformer(IgnoreAwareTransformer):
@@ -36,9 +39,12 @@ class _ReturnTupleParensDropTransformer(IgnoreAwareTransformer):
 
     @staticmethod
     def _is_single_line(node: Tuple) -> bool:
-        for paren in node.lpar:
-            if isinstance(paren.whitespace_after, ParenthesizedWhitespace):
-                return False
+
+        if any(
+            isinstance(paren.whitespace_after, ParenthesizedWhitespace)
+            for paren in node.lpar
+        ):
+            return False
         for element in node.elements:
             if isinstance(element, Element) and isinstance(
                 element.comma, Comma
@@ -47,11 +53,12 @@ class _ReturnTupleParensDropTransformer(IgnoreAwareTransformer):
                     element.comma.whitespace_after, ParenthesizedWhitespace
                 ):
                     return False
-        for paren in node.rpar:
-            if isinstance(paren, RightParen) and isinstance(
-                paren.whitespace_before, ParenthesizedWhitespace
-            ):
-                return False
+        if any(
+            isinstance(paren, RightParen)
+            and isinstance(paren.whitespace_before, ParenthesizedWhitespace)
+            for paren in node.rpar
+        ):
+            return False
         return True
 
 

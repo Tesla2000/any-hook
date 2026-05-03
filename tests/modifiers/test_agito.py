@@ -1,16 +1,17 @@
 import re
 from pathlib import Path
-from unittest import TestCase
-from unittest.mock import MagicMock
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
+
+from libcst import parse_module
 
 from any_hook._file_data import FileData
 from any_hook.files_modifiers._import_adder import ModuleImportAdder
-from any_hook.files_modifiers.agito import _AgitoTransformer
-from any_hook.files_modifiers.agito import Agito
+from any_hook.files_modifiers.agito import Agito, _AgitoTransformer
 from any_hook.files_modifiers.check_untracked import CheckUntracked
-from any_hook.files_modifiers.len_as_bool import _LenAsBoolTransformer
-from any_hook.files_modifiers.len_as_bool import LenAsBool
+from any_hook.files_modifiers.len_as_bool import (
+    LenAsBool,
+    _LenAsBoolTransformer,
+)
 from any_hook.files_modifiers.return_tuple_parens_drop import (
     _ReturnTupleParensDropTransformer,
 )
@@ -20,7 +21,6 @@ from any_hook.files_modifiers.typing_to_builtin import (
 from any_hook.files_modifiers.workflow_env_to_example import (
     WorkflowEnvToExample,
 )
-from libcst import parse_module
 from tests.modifiers._base import TransformerTestCase
 
 _CHECK_UNTRACKED_MODULE = f"{CheckUntracked.__module__}.subprocess.run"
@@ -67,7 +67,7 @@ class TestAgitoTransformer(TransformerTestCase):
             .visit(_TypingToBuiltinTransformer(_IGNORE, ModuleImportAdder()))
         )
         merged = module.visit(_AgitoTransformer(_make_transformers()))
-        self.assertEqual(sequential.code, merged.code)
+        assert sequential.code == merged.code
 
     def test_each_transformer_still_applies_independently(self):
         code = "if len(items):\n    pass\n"
@@ -87,11 +87,28 @@ class TestAgitoTransformer(TransformerTestCase):
         code = "x = 1\n"
         self._assert_no_transformation(code)
 
+    def test_transformer_returning_removal_sentinel_raises_error(self):
+        import libcst
+        import pytest
+
+        class BadTransformer(libcst.CSTTransformer):
+            def on_leave(self, original_node, updated_node):
+                # Return RemovalSentinel for Name nodes
+                if isinstance(updated_node, libcst.Name):
+                    return libcst.RemovalSentinel.REMOVE
+                return updated_node
+
+        code = "x = 1\n"
+        module = libcst.parse_module(code)
+        agito = _AgitoTransformer((BadTransformer(),))
+        with pytest.raises(ValueError, match="must be an instance of CSTNode"):
+            module.visit(agito)
+
     def _create_transformer(self) -> _AgitoTransformer:
         return _AgitoTransformer(_make_transformers())
 
 
-class TestAgitoGlobalModifiers(TestCase):
+class TestAgitoGlobalModifiers:
     def test_check_untracked_called_once_for_multiple_files(self):
         agito = Agito(modifiers=(CheckUntracked(directories=("src",)),))
         files = [
@@ -105,7 +122,7 @@ class TestAgitoGlobalModifiers(TestCase):
         ):
             mock_run.return_value = MagicMock(stdout="")
             agito.modify(iter(files))
-        self.assertEqual(mock_run.call_count, 1)
+        assert mock_run.call_count == 1
 
     def test_check_untracked_called_once_alongside_separate_modifier(self):
         agito = Agito(
@@ -118,7 +135,7 @@ class TestAgitoGlobalModifiers(TestCase):
         ):
             mock_run.return_value = MagicMock(stdout="")
             agito.modify(iter(files))
-        self.assertEqual(mock_run.call_count, 1)
+        assert mock_run.call_count == 1
 
     def test_workflow_env_to_example_called_once_for_multiple_files(self):
         modifier = WorkflowEnvToExample(
@@ -133,4 +150,21 @@ class TestAgitoGlobalModifiers(TestCase):
         ]
         with patch(_WORKFLOW_MODIFY, return_value=False) as mock_modify:
             agito.modify(iter(files))
-        self.assertEqual(mock_modify.call_count, 1)
+        assert mock_modify.call_count == 1
+
+    def test_excluded_path_skips_modification(self):
+        from tempfile import TemporaryDirectory
+
+        with TemporaryDirectory() as tmpdir:
+            test_file = Path(tmpdir) / "test.py"
+            test_file.write_text("if len(x):\n    pass\n")
+            agito = Agito(
+                modifiers=(LenAsBool(),),
+                excluded_paths=(str(test_file),),
+            )
+            file_data = FileData(
+                path=test_file,
+                content=test_file.read_text(),
+                module=parse_module(test_file.read_text()),
+            )
+            assert not agito.modify([file_data])

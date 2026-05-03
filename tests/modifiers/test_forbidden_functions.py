@@ -1,9 +1,10 @@
 from pathlib import Path
 from textwrap import dedent
 
+from libcst import parse_module
+
 from any_hook._file_data import FileData
 from any_hook.files_modifiers.forbidden_functions import ForbiddenFunctions
-from libcst import parse_module
 from tests.modifiers._base import TransformerTestCase
 
 
@@ -14,16 +15,14 @@ class TestForbiddenFunctions(TransformerTestCase):
             if hasattr(obj, "foo"):
                 print("has foo")
         """).lstrip()
-        result = self._check_code(code)
-        self.assertTrue(result)
+        assert self._check_code(code)
 
     def test_detects_hasattr_in_function(self):
         code = dedent("""
             def check_attr(obj):
                 return hasattr(obj, "name")
         """).lstrip()
-        result = self._check_code(code)
-        self.assertTrue(result)
+        assert self._check_code(code)
 
     def test_detects_hasattr_in_class(self):
         code = dedent("""
@@ -31,8 +30,7 @@ class TestForbiddenFunctions(TransformerTestCase):
                 def check(self, obj):
                     return hasattr(obj, "bar")
         """).lstrip()
-        result = self._check_code(code)
-        self.assertTrue(result)
+        assert self._check_code(code)
 
     def test_detects_multiple_hasattr(self):
         code = dedent("""
@@ -41,16 +39,14 @@ class TestForbiddenFunctions(TransformerTestCase):
                     return True
                 return False
         """).lstrip()
-        result = self._check_code(code)
-        self.assertTrue(result)
+        assert self._check_code(code)
 
     def test_ignores_hasattr_with_ignore_comment(self):
         code = dedent("""
             def check(obj):
                 return hasattr(obj, "name")  # ignore
         """).lstrip()
-        result = self._check_code(code)
-        self.assertFalse(result)
+        assert not self._check_code(code)
 
     def test_ignores_hasattr_with_custom_pattern(self):
         code = dedent("""
@@ -60,8 +56,7 @@ class TestForbiddenFunctions(TransformerTestCase):
         modifier = ForbiddenFunctions(
             ignore_pattern=r"#\s*noqa", forbidden_functions=(hasattr.__name__,)
         )
-        result = self._check_code_with_modifier(code, modifier)
-        self.assertFalse(result)
+        assert not self._check_code_with_modifier(code, modifier)
 
     def test_custom_pattern_not_matching(self):
         code = dedent("""
@@ -71,24 +66,21 @@ class TestForbiddenFunctions(TransformerTestCase):
         modifier = ForbiddenFunctions(
             ignore_pattern=r"#\s*noqa", forbidden_functions=(hasattr.__name__,)
         )
-        result = self._check_code_with_modifier(code, modifier)
-        self.assertTrue(result)
+        assert self._check_code_with_modifier(code, modifier)
 
     def test_case_insensitive_ignore(self):
         code = dedent("""
             def check(obj):
                 return hasattr(obj, "name")  # IGNORE
         """).lstrip()
-        result = self._check_code(code)
-        self.assertFalse(result)
+        assert not self._check_code(code)
 
     def test_no_hasattr_in_code(self):
         code = dedent("""
             def check(obj):
                 return obj.name if hasattr else None
         """).lstrip()
-        result = self._check_code(code)
-        self.assertFalse(result)
+        assert not self._check_code(code)
 
     def test_hasattr_as_string_not_detected(self):
         code = dedent("""
@@ -96,24 +88,21 @@ class TestForbiddenFunctions(TransformerTestCase):
                 text = "hasattr"
                 return text
         """).lstrip()
-        result = self._check_code(code)
-        self.assertFalse(result)
+        assert not self._check_code(code)
 
     def test_hasattr_with_variable_attribute(self):
         code = dedent("""
             def check(obj, attr_name):
                 return hasattr(obj, attr_name)
         """).lstrip()
-        result = self._check_code(code)
-        self.assertTrue(result)
+        assert self._check_code(code)
 
     def test_nested_hasattr(self):
         code = dedent("""
             def check(obj):
                 return hasattr(obj, "x") if hasattr(obj, "y") else False
         """).lstrip()
-        result = self._check_code(code)
-        self.assertTrue(result)
+        assert self._check_code(code)
 
     def _check_code(self, code: str) -> bool:
         file_data = FileData(
@@ -137,16 +126,14 @@ class TestForbiddenFunctions(TransformerTestCase):
                 return getattr(obj, "name", None)
         """).lstrip()
         modifier = ForbiddenFunctions(forbidden_functions=(getattr.__name__,))
-        result = self._check_code_with_modifier(code, modifier)
-        self.assertTrue(result)
+        assert self._check_code_with_modifier(code, modifier)
 
     def test_does_not_detect_getattr_by_default(self):
         code = dedent("""
             def check(obj):
                 return getattr(obj, "name", None)
         """).lstrip()
-        result = self._check_code(code)
-        self.assertFalse(result)
+        assert not self._check_code(code)
 
     def test_detects_both_hasattr_and_getattr(self):
         code = dedent("""
@@ -158,8 +145,7 @@ class TestForbiddenFunctions(TransformerTestCase):
         modifier = ForbiddenFunctions(
             forbidden_functions=(hasattr.__name__, getattr.__name__)
         )
-        result = self._check_code_with_modifier(code, modifier)
-        self.assertTrue(result)
+        assert self._check_code_with_modifier(code, modifier)
 
     def test_detects_custom_function_names(self):
         code = dedent("""
@@ -167,8 +153,7 @@ class TestForbiddenFunctions(TransformerTestCase):
                 return custom_func(obj, "name")
         """).lstrip()
         modifier = ForbiddenFunctions(forbidden_functions=("custom_func",))
-        result = self._check_code_with_modifier(code, modifier)
-        self.assertTrue(result)
+        assert self._check_code_with_modifier(code, modifier)
 
     def test_ignores_getattr_with_ignore_comment(self):
         code = dedent("""
@@ -176,8 +161,7 @@ class TestForbiddenFunctions(TransformerTestCase):
                 return getattr(obj, "name", None)  # ignore
         """).lstrip()
         modifier = ForbiddenFunctions(forbidden_functions=(getattr.__name__,))
-        result = self._check_code_with_modifier(code, modifier)
-        self.assertFalse(result)
+        assert not self._check_code_with_modifier(code, modifier)
 
     def test_empty_forbidden_functions_returns_false(self):
         code = dedent("""
@@ -185,8 +169,7 @@ class TestForbiddenFunctions(TransformerTestCase):
                 return hasattr(obj, "name")
         """).lstrip()
         modifier = ForbiddenFunctions(forbidden_functions=())
-        result = self._check_code_with_modifier(code, modifier)
-        self.assertFalse(result)
+        assert not self._check_code_with_modifier(code, modifier)
 
     def test_detects_multiple_different_functions(self):
         code = dedent("""
@@ -199,5 +182,26 @@ class TestForbiddenFunctions(TransformerTestCase):
         modifier = ForbiddenFunctions(
             forbidden_functions=(hasattr.__name__, getattr.__name__)
         )
-        result = self._check_code_with_modifier(code, modifier)
-        self.assertTrue(result)
+        assert self._check_code_with_modifier(code, modifier)
+
+    def test_forbidden_with_excluded_path(self):
+        from pathlib import Path as PathlibPath
+        from tempfile import TemporaryDirectory
+
+        code = dedent("""
+            x = eval("1+1")
+        """).lstrip()
+        with TemporaryDirectory() as tmpdir:
+            test_file = PathlibPath(tmpdir) / "test.py"
+            test_file.write_text(code)
+            modifier = ForbiddenFunctions(
+                forbidden_functions=("eval",),
+                excluded_paths=(str(test_file),),
+            )
+            file_data = FileData(
+                path=test_file, content=code, module=parse_module(code)
+            )
+            assert not modifier.modify([file_data])
+
+    def _create_transformer(self):
+        raise NotImplementedError

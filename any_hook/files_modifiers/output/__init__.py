@@ -1,8 +1,8 @@
-from typing import Annotated
-from typing import Union
+from typing import Annotated, Union
+
+from pydantic import Field
 
 from any_hook.files_modifiers.output.stdout import StandardOutput
-from pydantic import Field
 
 AnyOutput = Annotated[
     Union[StandardOutput],

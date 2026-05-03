@@ -1,16 +1,17 @@
 from collections.abc import Sequence
 
-from libcst import EmptyLine
-from libcst import ImportAlias
-from libcst import ImportFrom
-from libcst import ImportStar
-from libcst import MaybeSentinel
-from libcst import Module
-from libcst import Name
-from libcst import SimpleStatementLine
+from libcst import (
+    BaseCompoundStatement,
+    ImportAlias,
+    ImportFrom,
+    ImportStar,
+    MaybeSentinel,
+    Module,
+    Name,
+    SimpleStatementLine,
+)
 from libcst.helpers import get_absolute_module_for_import
-from pydantic import BaseModel
-from pydantic import ConfigDict
+from pydantic import BaseModel, ConfigDict
 
 
 class ModuleImportAdder(BaseModel):
@@ -25,7 +26,7 @@ class ModuleImportAdder(BaseModel):
     ) -> Module:
         if not add_names and not remove_names:
             return module
-        new_body = []
+        new_body: list[SimpleStatementLine | BaseCompoundStatement] = []
         import_found = False
         for statement in module.body:
             if (
@@ -74,14 +75,13 @@ class ModuleImportAdder(BaseModel):
                     continue
             new_body.append(statement)
         if not import_found and add_names:
-            new_import = SimpleStatementLine(
+            new_import_ = SimpleStatementLine(
                 body=[
                     ImportFrom(
                         module=Name(module_name),
                         names=[ImportAlias(name=Name(n)) for n in add_names],
                     )
                 ],
-                trailing_whitespace=EmptyLine(),
             )
-            new_body.insert(0, new_import)
+            new_body.insert(0, new_import_)
         return module.with_changes(body=new_body)

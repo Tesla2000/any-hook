@@ -1,9 +1,15 @@
 import re
-from typing import Any
 
-from libcst import CSTTransformer
-from libcst import IndentedBlock
-from libcst import SimpleStatementLine
+from libcst import (
+    ClassDef,
+    CSTTransformer,
+    For,
+    If,
+    IndentedBlock,
+    SimpleStatementLine,
+    While,
+    With,
+)
 
 
 class IgnoreAwareTransformer(CSTTransformer):
@@ -26,7 +32,9 @@ class IgnoreAwareTransformer(CSTTransformer):
         self._simple_line_ignored = False
         return updated_node
 
-    def _push_compound_ignore(self, node: Any) -> None:
+    def _push_compound_ignore(
+        self, node: ClassDef | If | While | For | With
+    ) -> None:
         self._compound_ignored_stack.append(self._is_header_ignored(node))
 
     def _pop_compound_ignore(self) -> bool:
@@ -38,7 +46,9 @@ class IgnoreAwareTransformer(CSTTransformer):
             and self._compound_ignored_stack[-1]
         )
 
-    def _is_header_ignored(self, node: Any) -> bool:
+    def _is_header_ignored(
+        self, node: ClassDef | If | While | For | With
+    ) -> bool:
         if not isinstance(node.body, IndentedBlock):
             return False
         comment = node.body.header.comment

@@ -133,6 +133,72 @@ class TestTypingToBuiltin(TransformerTestCase):
             "x: dict[str, int] = {}\n",
         )
 
+    def test_non_typing_module_not_changed(self):
+        self._assert_no_transformation(
+            "from mylib import Dict\nx: Dict[str, int]\n"
+        )
+
+    def test_skip_modify_file_without_typing_names(self):
+        from libcst import parse_module
+
+        from any_hook._file_data import FileData
+        from any_hook.files_modifiers.typing_to_builtin import TypingToBuiltin
+
+        modifier = TypingToBuiltin()
+        file_data = FileData(
+            path=None,
+            content="x = 5",
+            module=parse_module("x = 5"),
+        )
+        assert modifier._modify_file(file_data) is False
+
+    def test_modify_file_with_typing_names_processes(self):
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+
+        from libcst import parse_module
+
+        from any_hook._file_data import FileData
+        from any_hook.files_modifiers.typing_to_builtin import TypingToBuiltin
+
+        code = "from typing import Dict\nx: Dict[str, int]\n"
+        with TemporaryDirectory() as tmpdir:
+            test_file = Path(tmpdir) / "test.py"
+            test_file.write_text(code)
+            modifier = TypingToBuiltin()
+            file_data = FileData(
+                path=test_file,
+                content=code,
+                module=parse_module(code),
+            )
+            assert modifier._modify_file(file_data) is True
+
+    def test_all_names_ignored_keeps_import(self):
+        code = dedent("""
+            from typing import Dict, List
+            x: Dict[str, int]  # ignore
+            y: List[str]  # ignore
+        """).lstrip()
+        expected = dedent("""
+            from typing import Dict, List
+            x: Dict[str, int]  # ignore
+            y: List[str]  # ignore
+        """).lstrip()
+        self._assert_transformation(code, expected)
+
+    def test_mixed_usage_keeps_import(self):
+        code = dedent("""
+            from typing import Dict
+            x: Dict[str, int]  # ignore
+            y: Dict[str, str]
+        """).lstrip()
+        expected = dedent("""
+            from typing import Dict
+            x: Dict[str, int]  # ignore
+            y: dict[str, str]
+        """).lstrip()
+        self._assert_transformation(code, expected)
+
     def _create_transformer(self) -> _TypingToBuiltinTransformer:
         return _TypingToBuiltinTransformer(
             re.compile(r"#\s*ignore", re.IGNORECASE), ModuleImportAdder()

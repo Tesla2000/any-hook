@@ -1,14 +1,15 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from textwrap import dedent
-from unittest import TestCase
+
+import pytest
 
 from any_hook.files_modifiers.workflow_env_to_example import (
     WorkflowEnvToExample,
 )
 
 
-class TestWorkflowEnvToExample(TestCase):
+class TestWorkflowEnvToExample:
     def test_extracts_env_from_workflow_top_level(self):
         with TemporaryDirectory() as tmpdir:
             tmpdir_path = Path(tmpdir)
@@ -27,12 +28,12 @@ class TestWorkflowEnvToExample(TestCase):
                 workflow_paths=(workflow_file,), output_path=output_file
             )
             result = modifier.modify([])
-            self.assertTrue(result)
-            self.assertTrue(output_file.exists())
+            assert result
+            assert output_file.exists()
             content = output_file.read_text()
-            self.assertIn(f"# From: {workflow_file}", content)
-            self.assertIn("DATABASE_URL=postgres://localhost/test", content)
-            self.assertIn("API_KEY=test_key", content)
+            assert f"# From: {workflow_file}" in content
+            assert "DATABASE_URL=postgres://localhost/test" in content
+            assert "API_KEY=test_key" in content
 
     def test_extracts_env_from_job_level(self):
         with TemporaryDirectory() as tmpdir:
@@ -51,9 +52,9 @@ class TestWorkflowEnvToExample(TestCase):
                 workflow_paths=(workflow_file,), output_path=output_file
             )
             result = modifier.modify([])
-            self.assertTrue(result)
+            assert result
             content = output_file.read_text()
-            self.assertIn("TEST_VAR=test_value", content)
+            assert "TEST_VAR=test_value" in content
 
     def test_extracts_env_from_step_level(self):
         with TemporaryDirectory() as tmpdir:
@@ -75,9 +76,9 @@ class TestWorkflowEnvToExample(TestCase):
                 workflow_paths=(workflow_file,), output_path=output_file
             )
             result = modifier.modify([])
-            self.assertTrue(result)
+            assert result
             content = output_file.read_text()
-            self.assertIn("STEP_VAR=step_value", content)
+            assert "STEP_VAR=step_value" in content
 
     def test_does_not_duplicate_existing_vars(self):
         with TemporaryDirectory() as tmpdir:
@@ -95,10 +96,10 @@ class TestWorkflowEnvToExample(TestCase):
                 workflow_paths=(workflow_file,), output_path=output_file
             )
             result = modifier.modify([])
-            self.assertTrue(result)
+            assert result
             content = output_file.read_text()
-            self.assertEqual(content.count("DATABASE_URL"), 1)
-            self.assertIn("NEW_VAR=new_value", content)
+            assert content.count("DATABASE_URL") == 1
+            assert "NEW_VAR=new_value" in content
 
     def test_section_append(self):
         with TemporaryDirectory() as tmpdir:
@@ -118,11 +119,11 @@ class TestWorkflowEnvToExample(TestCase):
                 workflow_paths=(workflow_file,), output_path=output_file
             )
             result = modifier.modify([])
-            self.assertTrue(result)
+            assert result
             content = output_file.read_text()
-            self.assertEqual(content.count("DATABASE_URL"), 1)
-            self.assertEqual(content.count(str(workflow_file)), 1)
-            self.assertIn("NEW_VAR=new_value", content)
+            assert content.count("DATABASE_URL") == 1
+            assert content.count(str(workflow_file)) == 1
+            assert "NEW_VAR=new_value" in content
 
     def test_handles_multiple_workflow_files(self):
         with TemporaryDirectory() as tmpdir:
@@ -144,12 +145,12 @@ class TestWorkflowEnvToExample(TestCase):
                 workflow_paths=(workflow1, workflow2), output_path=output_file
             )
             result = modifier.modify([])
-            self.assertTrue(result)
+            assert result
             content = output_file.read_text()
-            self.assertIn(f"# From: {workflow1}", content)
-            self.assertIn(f"# From: {workflow2}", content)
-            self.assertIn("VAR1=value1", content)
-            self.assertIn("VAR2=value2", content)
+            assert f"# From: {workflow1}" in content
+            assert f"# From: {workflow2}" in content
+            assert "VAR1=value1" in content
+            assert "VAR2=value2" in content
 
     def test_raises_on_missing_workflow_file(self):
         with TemporaryDirectory() as tmpdir:
@@ -159,7 +160,7 @@ class TestWorkflowEnvToExample(TestCase):
             modifier = WorkflowEnvToExample(
                 workflow_paths=(workflow_file,), output_path=output_file
             )
-            with self.assertRaises(FileNotFoundError):
+            with pytest.raises(FileNotFoundError):
                 modifier.modify([])
 
     def test_returns_false_when_no_env_vars_found(self):
@@ -177,7 +178,7 @@ class TestWorkflowEnvToExample(TestCase):
                 workflow_paths=(workflow_file,), output_path=output_file
             )
             result = modifier.modify([])
-            self.assertFalse(result)
+            assert not result
 
     def test_returns_false_when_all_vars_already_present(self):
         with TemporaryDirectory() as tmpdir:
@@ -194,7 +195,7 @@ class TestWorkflowEnvToExample(TestCase):
                 workflow_paths=(workflow_file,), output_path=output_file
             )
             result = modifier.modify([])
-            self.assertFalse(result)
+            assert not result
 
     def test_handles_none_values(self):
         with TemporaryDirectory() as tmpdir:
@@ -211,10 +212,10 @@ class TestWorkflowEnvToExample(TestCase):
                 workflow_paths=(workflow_file,), output_path=output_file
             )
             result = modifier.modify([])
-            self.assertTrue(result)
+            assert result
             content = output_file.read_text()
-            self.assertIn("EMPTY_VAR=", content)
-            self.assertIn("VAR_WITH_VALUE=some_value", content)
+            assert "EMPTY_VAR=" in content
+            assert "VAR_WITH_VALUE=some_value" in content
 
     def test_handles_github_secrets(self):
         with TemporaryDirectory() as tmpdir:
@@ -232,13 +233,13 @@ class TestWorkflowEnvToExample(TestCase):
                 workflow_paths=(workflow_file,), output_path=output_file
             )
             result = modifier.modify([])
-            self.assertTrue(result)
+            assert result
             content = output_file.read_text()
-            self.assertIn("GH_TOKEN=\n", content)
-            self.assertIn("API_KEY=\n", content)
-            self.assertNotIn("${{", content)
-            self.assertNotIn("secrets", content)
-            self.assertIn("REGULAR_VAR=regular_value", content)
+            assert "GH_TOKEN=\n" in content
+            assert "API_KEY=\n" in content
+            assert "${{" not in content
+            assert "secrets" not in content
+            assert "REGULAR_VAR=regular_value" in content
 
     def test_ignores_specified_names(self):
         with TemporaryDirectory() as tmpdir:
@@ -258,8 +259,67 @@ class TestWorkflowEnvToExample(TestCase):
                 ignored_names=("IGNORE_ME", "ALSO_IGNORE"),
             )
             result = modifier.modify([])
-            self.assertTrue(result)
+            assert result
             content = output_file.read_text()
-            self.assertNotIn("IGNORE_ME", content)
-            self.assertNotIn("ALSO_IGNORE", content)
-            self.assertIn("KEEP_ME=kept_value", content)
+            assert "IGNORE_ME" not in content
+            assert "ALSO_IGNORE" not in content
+            assert "KEEP_ME=kept_value" in content
+
+    def test_skips_non_dict_yaml_content(self):
+        with TemporaryDirectory() as tmpdir:
+            tmpdir_path = Path(tmpdir)
+            workflow_file = tmpdir_path / "workflow.yml"
+            workflow_file.write_text("---\n- item1\n- item2\n")
+            output_file = tmpdir_path / ".env.example"
+            modifier = WorkflowEnvToExample(
+                workflow_paths=(workflow_file,),
+                output_path=output_file,
+            )
+            result = modifier.modify([])
+            assert result is False
+
+    def test_handles_existing_env_file_with_variables_and_comments(self):
+        with TemporaryDirectory() as tmpdir:
+            tmpdir_path = Path(tmpdir)
+            workflow_file = tmpdir_path / "workflow.yml"
+            workflow_file.write_text(dedent("""
+                name: Test
+                env:
+                  NEW_VAR: new_value
+            """))
+            output_file = tmpdir_path / ".env.example"
+            output_file.write_text(
+                "# This is a comment\nEXISTING_VAR=old_value\n"
+            )
+            modifier = WorkflowEnvToExample(
+                workflow_paths=(workflow_file,), output_path=output_file
+            )
+            result = modifier.modify([])
+            assert result
+            content = output_file.read_text()
+            assert "EXISTING_VAR=old_value" in content
+            assert "NEW_VAR=new_value" in content
+
+    def test_handles_non_dict_env_section(self):
+        with TemporaryDirectory() as tmpdir:
+            tmpdir_path = Path(tmpdir)
+            workflow_file = tmpdir_path / "workflow.yml"
+            workflow_file.write_text(dedent("""
+                name: Test
+                jobs:
+                  test:
+                    runs-on: ubuntu-latest
+                    env: "string_instead_of_dict"
+                    steps:
+                      - name: Step
+                        env:
+                          STEP_VAR: step_value
+            """))
+            output_file = tmpdir_path / ".env.example"
+            modifier = WorkflowEnvToExample(
+                workflow_paths=(workflow_file,), output_path=output_file
+            )
+            result = modifier.modify([])
+            assert result
+            content = output_file.read_text()
+            assert "STEP_VAR=step_value" in content

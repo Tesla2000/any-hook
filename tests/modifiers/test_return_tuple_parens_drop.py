@@ -68,6 +68,61 @@ class TestReturnTupleParensDrop(TransformerTestCase):
         code = "return (a, b)  # ignore\n"
         self._assert_no_transformation(code)
 
+    def test_skip_modify_file_without_return_parens(self):
+        from libcst import parse_module
+
+        from any_hook._file_data import FileData
+        from any_hook.files_modifiers.return_tuple_parens_drop import (
+            ReturnTupleParensDrop,
+        )
+
+        modifier = ReturnTupleParensDrop()
+        file_data = FileData(
+            path=None,
+            content="x = 5",
+            module=parse_module("x = 5"),
+        )
+        assert modifier._modify_file(file_data) is False
+
+    def test_nested_parens_multiline(self):
+        code = dedent("""
+            return (
+                (a, b),
+                c,
+            )
+        """).lstrip()
+        self._assert_no_transformation(code)
+
+    def test_closing_paren_with_newline_not_transformed(self):
+        code = dedent("""
+            return (a, b
+            )
+        """).lstrip()
+        self._assert_no_transformation(code)
+
+    def test_modify_file_with_return_parens_processes(self):
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+
+        from libcst import parse_module
+
+        from any_hook._file_data import FileData
+        from any_hook.files_modifiers.return_tuple_parens_drop import (
+            ReturnTupleParensDrop,
+        )
+
+        code = "def foo():\n    return (a, b)\n"
+        with TemporaryDirectory() as tmpdir:
+            test_file = Path(tmpdir) / "test.py"
+            test_file.write_text(code)
+            modifier = ReturnTupleParensDrop()
+            file_data = FileData(
+                path=test_file,
+                content=code,
+                module=parse_module(code),
+            )
+            assert modifier._modify_file(file_data) is True
+
     def _create_transformer(self) -> _ReturnTupleParensDropTransformer:
         return _ReturnTupleParensDropTransformer(
             re.compile(r"#\s*ignore", re.IGNORECASE)

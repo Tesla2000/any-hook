@@ -1,5 +1,4 @@
 from pathlib import Path
-from unittest import TestCase
 
 from any_hook import Main
 
@@ -7,7 +6,7 @@ _EXTERNAL = Path(__file__).parent / "_external_modules.py"
 _KWARGS = {"_cli_parse_args": False, "paths": ()}
 
 
-class TestExternalPath(TestCase):
+class TestExternalPath:
     def test_external_path(self):
         Main(
             external_modifiers_path=_EXTERNAL,
