@@ -1,7 +1,6 @@
 import pathlib
 import re
-from dataclasses import dataclass
-from typing import Literal, Optional, Sequence, Union
+from typing import Literal, NamedTuple, Optional, Sequence, TypeGuard, Union
 
 from libcst import (
     Arg,
@@ -44,12 +43,15 @@ _READ_TEXT_KWARGS = frozenset({"encoding", "errors"})
 _WRITE_TEXT_KWARGS = frozenset({"encoding", "errors", "newline"})
 
 
-@dataclass
-class _OpenInfo:
+class _OpenInfo(NamedTuple):
     path_arg: BaseExpression
     method_name: str
     var_name: str
     extra_kwargs: tuple[Arg, ...]
+
+
+def _check_infos(infos: list[_OpenInfo | None]) -> TypeGuard[list[_OpenInfo]]:
+    return all(infos)
 
 
 class _OpenToPathTransformer(IgnoreAwareTransformer):
@@ -87,9 +89,9 @@ class _OpenToPathTransformer(IgnoreAwareTransformer):
         if ignored:
             return updated_node
         open_infos = list(map(_parse_open_item, updated_node.items))
-        if any(info is None for info in open_infos):
+        if not _check_infos(open_infos):
             return updated_node
-        infos: list[_OpenInfo] = open_infos  # type: ignore[assignment]
+        infos: list[_OpenInfo] = open_infos
         body = updated_node.body
         if not isinstance(body, IndentedBlock):
             return updated_node

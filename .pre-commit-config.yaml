@@ -3,7 +3,7 @@ repos:
     rev: 26.3.1
     hooks:
       - id: black
-        args: ["--preview", "--line-length", "79"]
+        args: ["--preview", "--line-length", "79", "--target-version", "py312"]
   - repo: https://github.com/PyCQA/isort
     rev: 8.0.1
     hooks:
@@ -13,15 +13,6 @@ repos:
     hooks:
       - id: autoflake
         args: [ --remove-all-unused-imports, --in-place ]
-#  - repo: https://github.com/Tesla2000/StaticMarker
-#    rev: v0.0.3-alpha
-#    hooks:
-#     - id: static_marker
-#       stages: [pre-commit]
-#  - repo: https://github.com/Tesla2000/import-rules-enforcer
-#    rev: 'v0.0.14'
-#    hooks:
-#      - id: import_rules_enforcer
   - repo: https://github.com/pycqa/flake8
     rev: '7.3.0'
     hooks:
@@ -59,4 +50,4 @@ repos:
     rev: v3.2.0
     hooks:
       - id: any-hook
-        args: [--modifiers, '[{"type": "remove-f-prefix"},{"type": "open-to-path"},{"type": "any-to-object"},{"type": "check-untracked", "directories": ["any_hook","tests"]},{"type":"pydantic-config-to-model-config"},{"type":"pydantic-v1-to-v2"},{"type":"str-enum-inheritance"},{"type":"forbidden-functions","forbidden_functions":["hasattr","getattr"]},{"type":"forbidden-functions","forbidden_functions":["print"],"excluded_paths":["any_hook/files_modifiers/output/stdout.py","any_hook/_transaction.py","any_hook/files_modifiers/__init__.py","any_hook/files_modifiers/__init__.py"]},{"type":"utcnow-to-datetime-now"},{"type":"len-as-bool"},{"type":"typing-to-builtin"}]']
+        args: [--modifiers, '[{"type": "remove-f-prefix"},{"type": "open-to-path"},{"type": "any-to-object"},{"type": "local-imports"},{"type": "check-untracked", "directories": ["any_hook","tests"]},{"type":"pydantic-config-to-model-config"},{"type":"pydantic-v1-to-v2"},{"type":"str-enum-inheritance"},{"type":"forbidden-functions","forbidden_functions":["hasattr","getattr"]},{"type":"forbidden-functions","forbidden_functions":["print"],"excluded_paths":["any_hook/files_modifiers/output/stdout.py","any_hook/_transaction.py","any_hook/files_modifiers/__init__.py","any_hook/files_modifiers/__init__.py"]},{"type":"utcnow-to-datetime-now"},{"type":"len-as-bool"},{"type":"typing-to-builtin"}]']

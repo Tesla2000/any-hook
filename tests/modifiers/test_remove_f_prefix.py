@@ -1,6 +1,14 @@
 import re
+import tempfile
+from pathlib import Path
 
-from any_hook.files_modifiers.remove_f_prefix import _RemoveFPrefixTransformer
+from libcst import parse_module
+
+from any_hook._file_data import FileData
+from any_hook.files_modifiers.remove_f_prefix import (
+    RemoveFPrefix,
+    _RemoveFPrefixTransformer,
+)
 from tests.modifiers._base import TransformerTestCase
 
 
@@ -70,10 +78,6 @@ class TestRemoveFPrefix(TransformerTestCase):
         self._assert_no_transformation(code)
 
     def test_skip_modify_file_without_f_strings(self):
-        from libcst import parse_module
-
-        from any_hook._file_data import FileData
-        from any_hook.files_modifiers.remove_f_prefix import RemoveFPrefix
 
         modifier = RemoveFPrefix()
         file_data = FileData(
@@ -84,13 +88,6 @@ class TestRemoveFPrefix(TransformerTestCase):
         assert modifier._modify_file(file_data) is False
 
     def test_modify_file_with_single_quotes(self):
-        import tempfile
-        from pathlib import Path
-
-        from libcst import parse_module
-
-        from any_hook._file_data import FileData
-        from any_hook.files_modifiers.remove_f_prefix import RemoveFPrefix
 
         with tempfile.TemporaryDirectory() as tmpdir:
             test_file = Path(tmpdir) / "test.py"

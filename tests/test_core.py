@@ -3,9 +3,15 @@ import tempfile
 from pathlib import Path
 
 import pytest
+from libcst import parse_module
+from pydantic import ValidationError
 
 from any_hook import main
+from any_hook.__main__ import Main
+from any_hook._file_data import FileData
 from any_hook._transaction import transaction
+from any_hook.files_modifiers._import_adder import ModuleImportAdder
+from any_hook.files_modifiers.remove_f_prefix import RemoveFPrefix
 
 
 def test_transaction_success():
@@ -90,7 +96,6 @@ def test_main_callable():
 
 
 def test_external_modifiers_path_not_found():
-    from any_hook.__main__ import Main
 
     original_argv = sys.argv
     try:
@@ -109,10 +114,6 @@ def test_external_modifiers_path_not_found():
 
 
 def test_modifier_with_excluded_path():
-    from libcst import parse_module
-
-    from any_hook._file_data import FileData
-    from any_hook.files_modifiers.remove_f_prefix import RemoveFPrefix
 
     with tempfile.TemporaryDirectory() as tmpdir:
         test_file = Path(tmpdir) / "test.py"
@@ -128,9 +129,6 @@ def test_modifier_with_excluded_path():
 
 
 def test_modifier_with_both_include_exclude_paths_fails():
-    from pydantic import ValidationError
-
-    from any_hook.files_modifiers.remove_f_prefix import RemoveFPrefix
 
     with pytest.raises(ValidationError, match="Cannot specify both"):
         RemoveFPrefix(
@@ -140,7 +138,6 @@ def test_modifier_with_both_include_exclude_paths_fails():
 
 
 def test_modifier_with_included_paths():
-    from any_hook.files_modifiers.remove_f_prefix import RemoveFPrefix
 
     with tempfile.TemporaryDirectory() as tmpdir:
         test_file = Path(tmpdir) / "src" / "test.py"
@@ -156,9 +153,6 @@ def test_modifier_with_included_paths():
 
 
 def test_import_adder_with_no_changes():
-    from libcst import parse_module
-
-    from any_hook.files_modifiers._import_adder import ModuleImportAdder
 
     code = "x = 5"
     module = parse_module(code)

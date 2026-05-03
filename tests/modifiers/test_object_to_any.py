@@ -1,8 +1,16 @@
 import re
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from textwrap import dedent
 
+from libcst import parse_module
+
+from any_hook._file_data import FileData
 from any_hook.files_modifiers._import_adder import ModuleImportAdder
-from any_hook.files_modifiers.object_to_any import _ObjectToAnyTransformer
+from any_hook.files_modifiers.object_to_any import (
+    ObjectToAny,
+    _ObjectToAnyTransformer,
+)
 from tests.modifiers._base import TransformerTestCase
 
 
@@ -204,13 +212,6 @@ class TestObjectToAny(TransformerTestCase):
         self._assert_transformation(code, expected)
 
     def test_modify_file_with_object_processes(self):
-        from pathlib import Path
-        from tempfile import TemporaryDirectory
-
-        from libcst import parse_module
-
-        from any_hook._file_data import FileData
-        from any_hook.files_modifiers.object_to_any import ObjectToAny
 
         code = "x: object = 5\n"
         with TemporaryDirectory() as tmpdir:
@@ -225,10 +226,6 @@ class TestObjectToAny(TransformerTestCase):
             assert modifier._modify_file(file_data) is True
 
     def test_skip_modify_file_without_object(self):
-        from libcst import parse_module
-
-        from any_hook._file_data import FileData
-        from any_hook.files_modifiers.object_to_any import ObjectToAny
 
         modifier = ObjectToAny()
         file_data = FileData(

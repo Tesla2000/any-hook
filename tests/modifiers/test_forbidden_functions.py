@@ -1,4 +1,6 @@
 from pathlib import Path
+from pathlib import Path as PathlibPath
+from tempfile import TemporaryDirectory
 from textwrap import dedent
 
 from libcst import parse_module
@@ -185,8 +187,6 @@ class TestForbiddenFunctions(TransformerTestCase):
         assert self._check_code_with_modifier(code, modifier)
 
     def test_forbidden_with_excluded_path(self):
-        from pathlib import Path as PathlibPath
-        from tempfile import TemporaryDirectory
 
         code = dedent("""
             x = eval("1+1")

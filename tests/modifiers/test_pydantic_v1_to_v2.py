@@ -1,7 +1,14 @@
 import re
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from textwrap import dedent
 
+import libcst
+from libcst import parse_module
+
+from any_hook._file_data import FileData
 from any_hook.files_modifiers.pydantic_v1_to_v2 import (
+    PydanticV1ToV2,
     _PydanticV1ToV2Transformer,
 )
 from tests.modifiers._base import TransformerTestCase
@@ -176,10 +183,6 @@ class TestPydanticV1ToV2(TransformerTestCase):
         self._assert_transformation(code, expected)
 
     def test_skip_modify_file_without_pydantic_v1(self):
-        from libcst import parse_module
-
-        from any_hook._file_data import FileData
-        from any_hook.files_modifiers.pydantic_v1_to_v2 import PydanticV1ToV2
 
         modifier = PydanticV1ToV2()
         file_data = FileData(
@@ -349,7 +352,6 @@ class TestPydanticV1ToV2(TransformerTestCase):
         pydantic.v1 imports. The code should handle ImportFrom nodes with
         pydantic.v1 module directly.
         """
-        from libcst import parse_module
 
         code = "from pydantic.v1 import BaseModel"
         module = parse_module(code)
@@ -368,7 +370,6 @@ class TestPydanticV1ToV2(TransformerTestCase):
         properly builds nested module names using _build_module_name when
         processing from imports with nested modules.
         """
-        from libcst import parse_module
 
         code = "from pydantic.v1.fields.config import Extra"
         module = parse_module(code)
@@ -384,7 +385,6 @@ class TestPydanticV1ToV2(TransformerTestCase):
 
         Verifies lines 35-36 where module has exactly 2 parts after removing v1.
         """
-        from libcst import parse_module
 
         code = "from pydantic.v1 import BaseModel, Field"
         module = parse_module(code)
@@ -400,7 +400,6 @@ class TestPydanticV1ToV2(TransformerTestCase):
         This test verifies that the leave_Import logic handles import statements
         (not from-imports) with pydantic.v1 module.
         """
-        from libcst import parse_module
 
         code = "import pydantic.v1"
         module = parse_module(code)
@@ -416,7 +415,6 @@ class TestPydanticV1ToV2(TransformerTestCase):
         Verifies that the len(module_parts) > 2 branch properly builds
         nested module names for import statements.
         """
-        from libcst import parse_module
 
         code = "import pydantic.v1.fields.config"
         module = parse_module(code)
@@ -432,7 +430,6 @@ class TestPydanticV1ToV2(TransformerTestCase):
         This covers the else branch (line 65) when module parts don't match
         the pydantic.v1 pattern.
         """
-        from libcst import parse_module
 
         code = "import os.path"
         module = parse_module(code)
@@ -447,7 +444,6 @@ class TestPydanticV1ToV2(TransformerTestCase):
 
         Covers the case where only one import is pydantic.v1 and others are not.
         """
-        from libcst import parse_module
 
         code = "import os, pydantic.v1, sys"
         module = parse_module(code)
@@ -462,7 +458,6 @@ class TestPydanticV1ToV2(TransformerTestCase):
 
         Covers line 95 when len(parts) == 1, which returns Name(parts[0]).
         """
-        from libcst import parse_module
 
         code = "from pydantic.v1 import BaseModel"
         module = parse_module(code)
@@ -479,10 +474,6 @@ class TestPydanticV1ToV2(TransformerTestCase):
 
         Covers the early return at line 135 when the file doesn't contain pydantic.v1.
         """
-        from libcst import parse_module
-
-        from any_hook._file_data import FileData
-        from any_hook.files_modifiers.pydantic_v1_to_v2 import PydanticV1ToV2
 
         modifier = PydanticV1ToV2()
         file_data = FileData(
@@ -498,13 +489,6 @@ class TestPydanticV1ToV2(TransformerTestCase):
 
         Covers line 136 when pydantic.v1 is in the content.
         """
-        from pathlib import Path
-        from tempfile import TemporaryDirectory
-
-        from libcst import parse_module
-
-        from any_hook._file_data import FileData
-        from any_hook.files_modifiers.pydantic_v1_to_v2 import PydanticV1ToV2
 
         with TemporaryDirectory() as tmpdir:
             test_file = Path(tmpdir) / "test.py"
@@ -522,7 +506,6 @@ class TestPydanticV1ToV2(TransformerTestCase):
             assert modifier._modify_file(file_data) is True
 
     def test_get_module_parts_with_invalid_attribute_value(self):
-        import libcst
 
         transformer = self._create_transformer()
         # Create an Attribute with an invalid value type (not Name or Attribute)

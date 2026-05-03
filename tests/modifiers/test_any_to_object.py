@@ -1,7 +1,15 @@
 import re
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from textwrap import dedent
 
-from any_hook.files_modifiers.any_to_object import _AnyToObjectTransformer
+from libcst import parse_module
+
+from any_hook._file_data import FileData
+from any_hook.files_modifiers.any_to_object import (
+    AnyToObject,
+    _AnyToObjectTransformer,
+)
 from tests.modifiers._base import TransformerTestCase
 
 
@@ -80,13 +88,6 @@ class TestAnyToObject(TransformerTestCase):
         self._assert_no_transformation(code)
 
     def test_modify_file_with_any_processes(self):
-        from pathlib import Path
-        from tempfile import TemporaryDirectory
-
-        from libcst import parse_module
-
-        from any_hook._file_data import FileData
-        from any_hook.files_modifiers.any_to_object import AnyToObject
 
         code = "from typing import Any\nx: Any = 5\n"
         with TemporaryDirectory() as tmpdir:
@@ -207,10 +208,6 @@ class TestAnyToObject(TransformerTestCase):
         self._assert_transformation(code, expected)
 
     def test_skip_modify_file_without_any(self):
-        from libcst import parse_module
-
-        from any_hook._file_data import FileData
-        from any_hook.files_modifiers.any_to_object import AnyToObject
 
         modifier = AnyToObject()
         file_data = FileData(

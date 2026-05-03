@@ -1,7 +1,10 @@
 import re
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import MagicMock, patch
 
+import libcst
+import pytest
 from libcst import parse_module
 
 from any_hook._file_data import FileData
@@ -88,8 +91,6 @@ class TestAgitoTransformer(TransformerTestCase):
         self._assert_no_transformation(code)
 
     def test_transformer_returning_removal_sentinel_raises_error(self):
-        import libcst
-        import pytest
 
         class BadTransformer(libcst.CSTTransformer):
             def on_leave(self, original_node, updated_node):
@@ -153,7 +154,6 @@ class TestAgitoGlobalModifiers:
         assert mock_modify.call_count == 1
 
     def test_excluded_path_skips_modification(self):
-        from tempfile import TemporaryDirectory
 
         with TemporaryDirectory() as tmpdir:
             test_file = Path(tmpdir) / "test.py"

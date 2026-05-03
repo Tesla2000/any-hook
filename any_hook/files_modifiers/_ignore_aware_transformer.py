@@ -1,4 +1,5 @@
 import re
+from typing import Union
 
 from libcst import (
     ClassDef,
@@ -6,6 +7,7 @@ from libcst import (
     For,
     If,
     IndentedBlock,
+    RemovalSentinel,
     SimpleStatementLine,
     While,
     With,
@@ -28,7 +30,7 @@ class IgnoreAwareTransformer(CSTTransformer):
 
     def leave_SimpleStatementLine(
         self, _: SimpleStatementLine, updated_node: SimpleStatementLine
-    ) -> SimpleStatementLine:
+    ) -> Union[SimpleStatementLine, RemovalSentinel]:
         self._simple_line_ignored = False
         return updated_node
 
