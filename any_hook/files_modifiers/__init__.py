@@ -7,6 +7,7 @@ from any_hook.files_modifiers._base import Modifier
 from any_hook.files_modifiers.agito import Agito
 from any_hook.files_modifiers.any_to_object import AnyToObject
 from any_hook.files_modifiers.check_untracked import CheckUntracked
+from any_hook.files_modifiers.combine_with import CombineWith
 from any_hook.files_modifiers.field_validator_check import FieldValidatorCheck
 from any_hook.files_modifiers.forbidden_functions import ForbiddenFunctions
 from any_hook.files_modifiers.len_as_bool import LenAsBool
@@ -45,6 +46,7 @@ _modifier_types: list[type] = [
     OpenToPath,
     CheckUntracked,
     Agito,
+    CombineWith,
 ]
 __all__ = [
     "Modifier",
@@ -65,6 +67,7 @@ __all__ = [
     "ReturnTupleParensDrop",
     "CheckUntracked",
     "OpenToPath",
+    "CombineWith",
     "AnyModifier",
 ]
 try:
@@ -109,6 +112,7 @@ if TYPE_CHECKING:
             OpenToPath,
             CheckUntracked,
             Agito,
+            CombineWith,
             WorkflowEnvToExample,
             GenerateStubs,
         ],
