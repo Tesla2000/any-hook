@@ -12,6 +12,33 @@ A collection of customizable pre-commit hooks for Python code quality and transf
 
 `any-hook` is a flexible pre-commit hook framework that provides various code modifiers and validators for Python projects. It uses libcst for AST-based transformations and Pydantic for configuration management.
 
+## Table of Contents
+
+- [Installation](#installation)
+- [Available Modifiers](#available-modifiers)
+  - [agito](#agito)
+  - [any-to-object](#any-to-object)
+  - [check-untracked](#check-untracked)
+  - [combine-with](#combine-with)
+  - [field-validator-check](#field-validator-check)
+  - [forbidden-functions](#forbidden-functions)
+  - [generate-stubs](#generate-stubs)
+  - [len-as-bool](#len-as-bool)
+  - [local-imports](#local-imports)
+  - [local-imports-to-top](#local-imports-to-top)
+  - [object-to-any](#object-to-any)
+  - [open-to-path](#open-to-path)
+  - [pydantic-config-to-model-config](#pydantic-config-to-model-config)
+  - [pydantic-v1-to-v2](#pydantic-v1-to-v2)
+  - [remove-f-prefix](#remove-f-prefix)
+  - [return-tuple-parens-drop](#return-tuple-parens-drop)
+  - [str-enum-inheritance](#str-enum-inheritance)
+  - [test-if-checker](#test-if-checker)
+  - [typing-to-builtin](#typing-to-builtin)
+  - [utcnow-to-datetime-now](#utcnow-to-datetime-now)
+  - [workflow-env-to-example](#workflow-env-to-example)
+- [Documentation](#documentation)
+
 ## Documentation
 
 For comprehensive documentation including detailed API reference and configuration options for all modifiers, see the [full documentation](https://github.com/Tesla2000/any-hook/tree/main/docs).
