@@ -24,6 +24,7 @@ from any_hook.files_modifiers.return_tuple_parens_drop import (
     ReturnTupleParensDrop,
 )
 from any_hook.files_modifiers.str_enum_inheritance import StrEnumInheritance
+from any_hook.files_modifiers.test_if_checker import TestIfChecker
 from any_hook.files_modifiers.typing_to_builtin import TypingToBuiltin
 from any_hook.files_modifiers.utcnow_to_datetime_now import UtcNowToDatetimeNow
 
@@ -45,6 +46,7 @@ _modifier_types: list[type] = [
     RemoveFPrefix,
     OpenToPath,
     CheckUntracked,
+    TestIfChecker,
     Agito,
     CombineWith,
 ]
@@ -68,6 +70,7 @@ __all__ = [
     "CheckUntracked",
     "OpenToPath",
     "CombineWith",
+    "TestIfChecker",
     "AnyModifier",
 ]
 try:
@@ -111,6 +114,7 @@ if TYPE_CHECKING:
             RemoveFPrefix,
             OpenToPath,
             CheckUntracked,
+            TestIfChecker,
             Agito,
             CombineWith,
             WorkflowEnvToExample,
