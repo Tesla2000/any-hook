@@ -477,6 +477,56 @@ while queue:
     queue.pop()
 ```
 
+### test-if-checker
+
+Detects conditional logic in test functions that should be parametrized instead.
+
+**What it does:**
+- Identifies `if`/`elif`/`else` statements in test functions
+- Detects inline if expressions (ternary operator) in test code
+- Allows conditional logic in nested function definitions (test helpers/factories)
+- Respects parametrization decorators and other configured ignore decorators
+- Reports file path and line number in standard format
+
+**Violations detected:**
+- Top-level conditional statements in test functions
+- Ternary (inline if) expressions in test code
+- Nested if statements that can be parametrized
+
+**Options:**
+- `test_file_pattern` (default: `test_.*\.py$`) — regex to identify test files
+- `test_function_pattern` (default: `^test_`) — regex to identify test functions
+- `ignored_decorators` (default: `("pytest.mark.parametrize",)`) — decorators that suppress checks
+
+**Examples:**
+```python
+# Violation — should use parametrize
+def test_values():
+    if value > 0:
+        assert True
+    else:
+        assert False
+
+# Allowed — parametrized test
+@pytest.mark.parametrize("value", [1, 2, 3])
+def test_with_params(value):
+    assert value > 0
+
+# Allowed — nested function (test helper)
+def test_something():
+    def validate(x):
+        if x < 0:
+            return False
+        return True
+    assert validate(10)
+
+# Allowed — custom decorator
+@pytest.mark.skip
+def test_skipped():
+    if condition:
+        assert True
+```
+
 ### typing-to-builtin
 
 Modernizes type hints from `typing` module to builtin equivalents (Python 3.9+).
