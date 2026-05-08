@@ -749,9 +749,24 @@ class TestPydanticConfigToModelConfig(TransformerTestCase):
                 model_config = {"frozen": False}
         """).lstrip()
         expected = dedent("""
+            from typing import ClassVar
             from pydantic import BaseModel, ConfigDict
             class User(BaseModel):
-                model_config = {"frozen": False}
+                model_config: ClassVar[ConfigDict] = ConfigDict(frozen=False)
+        """).lstrip()
+        self._assert_transformation(code, expected)
+
+    def test_model_config_assign_dict_literal(self):
+        code = dedent("""
+            from pydantic import BaseModel, ConfigDict
+            class User(BaseModel):
+                model_config = dict(frozen=False)
+        """).lstrip()
+        expected = dedent("""
+            from typing import ClassVar
+            from pydantic import BaseModel, ConfigDict
+            class User(BaseModel):
+                model_config: ClassVar[ConfigDict] = ConfigDict(frozen=False)
         """).lstrip()
         self._assert_transformation(code, expected)
 
@@ -800,6 +815,103 @@ class TestPydanticConfigToModelConfig(TransformerTestCase):
             from pydantic import BaseModel, ConfigDict
             class User(BaseModel):
                 model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid", frozen=True)
+        """).lstrip()
+        self._assert_transformation(code, expected)
+
+    def test_merge_inline_with_model_config_assign_dict_value(self):
+        code = dedent("""
+            from pydantic import BaseModel, ConfigDict
+            class User(BaseModel, frozen=True):
+                model_config = {"extra": "forbid"}
+        """).lstrip()
+        expected = dedent("""
+            from typing import ClassVar
+            from pydantic import BaseModel, ConfigDict
+            class User(BaseModel):
+                model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid", frozen=True)
+        """).lstrip()
+        self._assert_transformation(code, expected)
+
+    def test_merge_inline_with_ann_assign_no_value(self):
+        code = dedent("""
+            from pydantic import BaseModel, ConfigDict
+            from typing import ClassVar
+            class User(BaseModel, frozen=True):
+                model_config: ClassVar[ConfigDict]
+        """).lstrip()
+        expected = dedent("""
+            from pydantic import BaseModel, ConfigDict
+            from typing import ClassVar
+            class User(BaseModel):
+                model_config: ClassVar[ConfigDict]
+        """).lstrip()
+        self._assert_transformation(code, expected)
+
+    def test_upgrade_skipped_for_non_model_config_assign(self):
+        code = dedent("""
+            from pydantic import BaseModel, ConfigDict
+            class User(BaseModel):
+                model_config = {"frozen": True}
+                other_var = {"key": "value"}
+        """).lstrip()
+        expected = dedent("""
+            from typing import ClassVar
+            from pydantic import BaseModel, ConfigDict
+            class User(BaseModel):
+                model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+                other_var = {"key": "value"}
+        """).lstrip()
+        self._assert_transformation(code, expected)
+
+    def test_dict_call_assign_upgraded(self):
+        code = dedent("""
+            from pydantic import BaseModel, ConfigDict
+            class User(BaseModel):
+                model_config = dict(frozen=True)
+        """).lstrip()
+        expected = dedent("""
+            from typing import ClassVar
+            from pydantic import BaseModel, ConfigDict
+            class User(BaseModel):
+                model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+        """).lstrip()
+        self._assert_transformation(code, expected)
+
+    def test_dict_with_starred_element_not_upgraded(self):
+        code = dedent("""
+            from pydantic import BaseModel, ConfigDict
+            class User(BaseModel):
+                model_config = {**other_config}
+        """).lstrip()
+        self._assert_no_transformation(code)
+
+    def test_dict_with_non_string_key_not_upgraded(self):
+        code = dedent("""
+            from pydantic import BaseModel, ConfigDict
+            class User(BaseModel):
+                model_config = {1: "value"}
+        """).lstrip()
+        self._assert_no_transformation(code)
+
+    def test_dict_with_non_identifier_string_key_not_upgraded(self):
+        code = dedent("""
+            from pydantic import BaseModel, ConfigDict
+            class User(BaseModel):
+                model_config = {"not an identifier": "value"}
+        """).lstrip()
+        self._assert_no_transformation(code)
+
+    def test_empty_dict_assign_upgraded(self):
+        code = dedent("""
+            from pydantic import BaseModel, ConfigDict
+            class User(BaseModel):
+                model_config = {}
+        """).lstrip()
+        expected = dedent("""
+            from typing import ClassVar
+            from pydantic import BaseModel, ConfigDict
+            class User(BaseModel):
+                model_config: ClassVar[ConfigDict] = ConfigDict()
         """).lstrip()
         self._assert_transformation(code, expected)
 
