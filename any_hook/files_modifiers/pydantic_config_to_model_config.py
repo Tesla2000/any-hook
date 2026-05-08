@@ -8,10 +8,13 @@ from libcst import (
     Arg,
     Assign,
     AssignEqual,
+    BaseExpression,
     Call,
     ClassDef,
     Comma,
     CSTNode,
+    Dict,
+    DictElement,
     ImportFrom,
     ImportStar,
     IndentedBlock,
@@ -20,6 +23,7 @@ from libcst import (
     Module,
     Name,
     SimpleStatementLine,
+    SimpleString,
     SimpleWhitespace,
     Subscript,
     SubscriptElement,
@@ -132,6 +136,13 @@ class _PydanticConfigToModelConfigTransformer(IgnoreAwareTransformer):
             new_body.insert(0, model_config_statement)
         elif inline_args and not has_model_config and config_class_inserted:
             result = self._strip_keywords(updated_node)
+        elif (
+            not inline_args and has_model_config and not config_class_inserted
+        ):
+            upgraded_body = list(self._upgrade_model_config_assign(new_body))
+            if upgraded_body != new_body:
+                new_body = upgraded_body
+                self._made_changes = True
         if (
             new_body != list(updated_node.body.body)
             or result is not updated_node
@@ -192,21 +203,23 @@ class _PydanticConfigToModelConfigTransformer(IgnoreAwareTransformer):
                 and isinstance(body_item.target, Name)
                 and body_item.target.value == "model_config"
             ):
-                if not isinstance(body_item.value, Call):
+                if body_item.value is None:
+                    yield statement
+                    continue
+                config_call = cls._coerce_to_config_dict_call(body_item.value)
+                if config_call is None:
                     yield statement
                     continue
                 existing_keys = {
                     arg.keyword.value
-                    for arg in body_item.value.args
+                    for arg in config_call.args
                     if arg.keyword
                 }
                 if inline_keys & existing_keys:
                     raise ValueError(
                         f"Conflicting model_config keys defined in both inline class kwargs and model_config: {inline_keys & existing_keys}"
                     )
-                updated_value = cls._add_args_to_call(
-                    body_item.value, inline_args
-                )
+                updated_value = cls._add_args_to_call(config_call, inline_args)
                 yield statement.with_changes(
                     body=[body_item.with_changes(value=updated_value)]
                 )
@@ -218,16 +231,20 @@ class _PydanticConfigToModelConfigTransformer(IgnoreAwareTransformer):
                     if isinstance(t.target, Name)
                 }
                 if "model_config" in target_names:
-                    if not isinstance(body_item.value, Call):
+                    config_call = cls._coerce_to_config_dict_call(
+                        body_item.value
+                    )
+                    if config_call is None:
                         if inline_keys:
                             raise ValueError(
                                 f"Conflicting model_config keys defined in both inline class kwargs and model_config: {inline_keys}"
                             )
                         yield statement
                         continue
+                    body_item = body_item.with_changes(value=config_call)
                     existing_keys = {
                         arg.keyword.value
-                        for arg in body_item.value.args
+                        for arg in config_call.args
                         if arg.keyword
                     }
                     if inline_keys & existing_keys:
@@ -235,7 +252,7 @@ class _PydanticConfigToModelConfigTransformer(IgnoreAwareTransformer):
                             f"Conflicting model_config keys defined in both inline class kwargs and model_config: {inline_keys & existing_keys}"
                         )
                     updated_value = cls._add_args_to_call(
-                        body_item.value, inline_args
+                        config_call, inline_args
                     )
                     upgraded = AnnAssign(
                         target=Name("model_config"),
@@ -256,6 +273,81 @@ class _PydanticConfigToModelConfigTransformer(IgnoreAwareTransformer):
                     yield statement.with_changes(body=[upgraded])
                     continue
             yield statement
+
+    @classmethod
+    def _upgrade_model_config_assign(
+        cls, body: Iterable[CSTNode]
+    ) -> Iterable[CSTNode]:
+        for statement in body:
+            if not (
+                isinstance(statement, SimpleStatementLine)
+                and len(statement.body) == 1
+            ):
+                yield statement
+                continue
+            body_item = statement.body[0]
+            if not isinstance(body_item, Assign):
+                yield statement
+                continue
+            target_names = {
+                t.target.value
+                for t in body_item.targets
+                if isinstance(t.target, Name)
+            }
+            if "model_config" not in target_names:
+                yield statement
+                continue
+            config_call = cls._coerce_to_config_dict_call(body_item.value)
+            if config_call is None or config_call is body_item.value:
+                yield statement
+                continue
+            upgraded = AnnAssign(
+                target=Name("model_config"),
+                annotation=Annotation(
+                    annotation=Subscript(
+                        value=Name("ClassVar"),
+                        slice=[
+                            SubscriptElement(
+                                slice=Index(value=Name(ConfigDict.__name__))
+                            )
+                        ],
+                    ),
+                ),
+                value=config_call,
+            )
+            yield statement.with_changes(body=[upgraded])
+
+    @staticmethod
+    def _coerce_to_config_dict_call(value: BaseExpression) -> Call | None:
+        if isinstance(value, Call):
+            if isinstance(value.func, Name) and value.func.value == "dict":
+                return value.with_changes(func=Name(ConfigDict.__name__))
+            return value
+        if not isinstance(value, Dict):
+            return None
+        args: list[Arg] = []
+        for element in value.elements:
+            if not isinstance(element, DictElement):
+                return None
+            if not isinstance(element.key, SimpleString):
+                return None
+            key_value = element.key.evaluated_value
+            if not isinstance(key_value, str) or not key_value.isidentifier():
+                return None
+            args.append(
+                Arg(
+                    value=element.value,
+                    keyword=Name(key_value),
+                    equal=AssignEqual(
+                        whitespace_before=SimpleWhitespace(""),
+                        whitespace_after=SimpleWhitespace(""),
+                    ),
+                    comma=Comma(whitespace_after=SimpleWhitespace(" ")),
+                )
+            )
+        if args:
+            args[-1] = args[-1].with_changes(comma=MaybeSentinel.DEFAULT)
+        return Call(func=Name(ConfigDict.__name__), args=args)
 
     @staticmethod
     def _add_args_to_call(call: Call, new_args: list[Arg]) -> Call:

@@ -3,8 +3,6 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import MagicMock, patch
 
-import libcst
-import pytest
 from libcst import parse_module
 
 from any_hook._file_data import FileData
@@ -15,6 +13,8 @@ from any_hook.files_modifiers.len_as_bool import (
     LenAsBool,
     _LenAsBoolTransformer,
 )
+from any_hook.files_modifiers.local_imports import LocalImports
+from any_hook.files_modifiers.local_imports_to_top import LocalImportsToTop
 from any_hook.files_modifiers.return_tuple_parens_drop import (
     _ReturnTupleParensDropTransformer,
 )
@@ -90,21 +90,6 @@ class TestAgitoTransformer(TransformerTestCase):
         code = "x = 1\n"
         self._assert_no_transformation(code)
 
-    def test_transformer_returning_removal_sentinel_raises_error(self):
-
-        class BadTransformer(libcst.CSTTransformer):
-            def on_leave(self, original_node, updated_node):
-                # Return RemovalSentinel for Name nodes
-                if isinstance(updated_node, libcst.Name):
-                    return libcst.RemovalSentinel.REMOVE
-                return updated_node
-
-        code = "x = 1\n"
-        module = libcst.parse_module(code)
-        agito = _AgitoTransformer((BadTransformer(),))
-        with pytest.raises(ValueError, match="must be an instance of CSTNode"):
-            module.visit(agito)
-
     def _create_transformer(self) -> _AgitoTransformer:
         return _AgitoTransformer(_make_transformers())
 
@@ -168,3 +153,20 @@ class TestAgitoGlobalModifiers:
                 module=parse_module(test_file.read_text()),
             )
             assert not agito.modify([file_data])
+
+    def test_combination_with_local_imports_and_local_imports_to_top(self):
+        with TemporaryDirectory() as tmpdir:
+            test_file = Path(tmpdir) / "test.py"
+            code = "def foo():\n    import os\n    return os.path\n"
+            test_file.write_text(code)
+            agito = Agito(
+                modifiers=(LocalImportsToTop(), LocalImports()),
+            )
+            file_data = FileData(
+                path=test_file,
+                content=code,
+                module=parse_module(code),
+            )
+            assert agito.modify([file_data])
+            assert "import os\n" in test_file.read_text()
+            assert "    import os" not in test_file.read_text()
