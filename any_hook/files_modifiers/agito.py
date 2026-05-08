@@ -1,12 +1,13 @@
 import re
 from collections.abc import Iterable
-from functools import reduce
-from typing import TYPE_CHECKING, Annotated, Literal, TypeGuard
+from typing import TYPE_CHECKING, Annotated, Literal, Union
 
 from libcst import (
     CSTNode,
     CSTNodeT,
     CSTTransformer,
+    FlattenSentinel,
+    RemovalSentinel,
 )
 from pydantic import Field
 
@@ -16,10 +17,6 @@ from any_hook.files_modifiers.separate_modifier import SeparateModifier
 
 if TYPE_CHECKING:
     from any_hook.files_modifiers import AnyModifier
-
-
-def _cst_node_type_guard(node: object) -> TypeGuard[CSTNodeT]:
-    return isinstance(node, CSTNode)
 
 
 class _AgitoTransformer(CSTTransformer):
@@ -32,16 +29,13 @@ class _AgitoTransformer(CSTTransformer):
 
     def on_leave(
         self, original_node: CSTNodeT, updated_node: CSTNodeT
-    ) -> CSTNodeT:
-        def run_leave(node: CSTNodeT, transformer: CSTTransformer) -> CSTNodeT:
-            result: object = transformer.on_leave(original_node, node)
-            if _cst_node_type_guard(result):
-                return result
-            raise ValueError(
-                f"{result=} must be an instance of {CSTNode.__name__}"
-            )
-
-        return reduce(run_leave, self._transformers, updated_node)
+    ) -> Union[CSTNodeT, RemovalSentinel, FlattenSentinel[CSTNodeT]]:
+        for transformer in self._transformers:
+            node = transformer.on_leave(original_node, updated_node)
+            if not isinstance(node, CSTNode):
+                return node
+            updated_node = node
+        return updated_node
 
 
 class Agito(Modifier):
