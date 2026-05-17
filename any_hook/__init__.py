@@ -8,7 +8,4 @@ class _Main:
 
 
 main = _Main()
-__all__ = [
-    "main",
-    "FileData",
-]
+__all__ = ["main", "FileData"]
