@@ -1562,6 +1562,21 @@ class TestLocalImportsToTop(TransformerTestCase):
                         del sys.modules[mod]
                 importlib.invalidate_caches()
 
+    def test_module_docstring_stays_at_top(self):
+        code = dedent("""
+            \"\"\"Module docstring.\"\"\"
+            def process():
+                import os
+                return os.path
+        """).lstrip()
+        expected = dedent("""
+            \"\"\"Module docstring.\"\"\"
+            import os
+            def process():
+                return os.path
+        """).lstrip()
+        self._assert_transformation(code, expected)
+
     def _create_transformer(self) -> _LocalImportsToTopTransformer:
         return _LocalImportsToTopTransformer(
             re.compile(r"#\s*ignore", re.IGNORECASE),
