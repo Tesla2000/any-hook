@@ -589,6 +589,24 @@ class TestPydanticConfigToModelConfig(TransformerTestCase):
         """).lstrip()
         self._assert_transformation(code, expected)
 
+    def test_non_pydantic_class_keyword_args_unchanged(self):
+        code = dedent("""
+            from typing import TypedDict
+            class Movie(TypedDict, total=False):
+                name: str
+                year: int
+        """).lstrip()
+        self._assert_no_transformation(code)
+
+    def test_typed_dict_total_keyword_stays_intact(self):
+        code = dedent("""
+            from typing import TypedDict
+            class User(TypedDict, total=False):
+                name: str
+                age: int
+        """).lstrip()
+        self._assert_no_transformation(code)
+
     def test_inline_kwargs_with_config_class_inserted(self):
         code = dedent("""
             from pydantic import BaseModel
@@ -1059,7 +1077,7 @@ class TestStripKeywordsEdgeCases:
 
 
 class TestPydanticConfigStripKeywords(TransformerTestCase):
-    def test_inline_kwargs_with_inherited_class_strips_keywords(self):
+    def test_inline_kwargs_with_non_pydantic_base_unchanged(self):
         code = dedent("""
             from pydantic import BaseModel
             class Base:
@@ -1067,16 +1085,74 @@ class TestPydanticConfigStripKeywords(TransformerTestCase):
             class User(Base, frozen=True):
                 name: str
         """).lstrip()
+        self._assert_no_transformation(code)
+
+    def test_inline_kwargs_with_pydantic_base_strips_keywords(self):
+        code = dedent("""
+            from pydantic import BaseModel
+            class User(BaseModel, frozen=True):
+                name: str
+        """).lstrip()
         expected = dedent("""
             from typing import ClassVar
             from pydantic import BaseModel, ConfigDict
-            class Base:
+            class User(BaseModel):
+                model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+                name: str
+        """).lstrip()
+        self._assert_transformation(code, expected)
+
+    def test_indirect_pydantic_inheritance_strips_keywords(self):
+        code = dedent("""
+            from pydantic import BaseModel
+            class Base(BaseModel):
+                pass
+            class User(Base, frozen=True):
+                name: str
+        """).lstrip()
+        expected = dedent("""
+            from typing import ClassVar
+            from pydantic import BaseModel, ConfigDict
+            class Base(BaseModel):
                 pass
             class User(Base):
                 model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
                 name: str
         """).lstrip()
         self._assert_transformation(code, expected)
+
+    def test_attribute_base_pydantic_basemodel(self):
+        code = dedent("""
+            import pydantic
+            class User(pydantic.BaseModel, frozen=True):
+                name: str
+        """).lstrip()
+        expected = dedent("""
+            from typing import ClassVar
+            from pydantic import ConfigDict
+            import pydantic
+            class User(pydantic.BaseModel):
+                model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+                name: str
+        """).lstrip()
+        self._assert_transformation(code, expected)
+
+    def test_inherited_base_from_local_class_not_pydantic(self):
+        code = dedent("""
+            class LocalBase:
+                pass
+            class User(LocalBase, frozen=True):
+                name: str
+        """).lstrip()
+        self._assert_no_transformation(code)
+
+    def test_basemodel_aliased_name(self):
+        code = dedent("""
+            from pydantic import BaseModel as Model
+            class User(Model, frozen=True):
+                name: str
+        """).lstrip()
+        self._assert_no_transformation(code)
 
     def _create_transformer(self) -> _PydanticConfigToModelConfigTransformer:
         return _PydanticConfigToModelConfigTransformer(
@@ -1130,14 +1206,7 @@ class TestPydanticConfigImportHandling(TransformerTestCase):
                 class Config:
                     frozen = True
         """).lstrip()
-        expected = dedent("""
-            from typing import ClassVar
-            from pydantic import ConfigDict
-            from pydantic import *
-            class User:
-                model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
-        """).lstrip()
-        self._assert_transformation(code, expected)
+        self._assert_no_transformation(code)
 
     def test_import_star_from_typing_with_inline_kwargs(self):
         code = dedent("""
