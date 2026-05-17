@@ -36,6 +36,7 @@ from any_hook.files_modifiers._ignore_aware_transformer import (
 )
 from any_hook.files_modifiers._import_adder import ModuleImportAdder
 from any_hook.files_modifiers.separate_modifier import SeparateModifier
+from any_hook.services import ClassHierarchyDetector
 
 
 class _PydanticConfigToModelConfigTransformer(IgnoreAwareTransformer):
@@ -52,6 +53,17 @@ class _PydanticConfigToModelConfigTransformer(IgnoreAwareTransformer):
         self._has_class_var_import = False
         self._current_class_depth = 0
         self._config_class_name = config_class_name
+        self._pydantic_base_names: set[str] = {"BaseModel"}
+        self._class_definitions: dict[str, ClassDef] = {}
+        self._hierarchy_detector: ClassHierarchyDetector = (
+            ClassHierarchyDetector(self._class_definitions)
+        )
+
+    def visit_Module(self, node: Module) -> bool:
+        for item in node.body:
+            if isinstance(item, ClassDef):
+                self._class_definitions[item.name.value] = item
+        return True
 
     def visit_ClassDef(self, node: ClassDef) -> bool:
         self._current_class_depth += 1
@@ -69,6 +81,10 @@ class _PydanticConfigToModelConfigTransformer(IgnoreAwareTransformer):
         if ignored:
             return updated_node
         if not isinstance(updated_node.body, IndentedBlock):
+            return updated_node
+        if not self._hierarchy_detector.is_subclass_of(
+            updated_node, self._pydantic_base_names
+        ):
             return updated_node
         inline_args = list(updated_node.keywords)
         new_body: list[CSTNode] = []

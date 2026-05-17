@@ -287,6 +287,9 @@ class User(BaseModel):
     name: str
 ```
 
+**Limitations:**
+- Only transforms classes that explicitly inherit from `BaseModel` (or its subclasses) defined within the same file. Classes inheriting from Pydantic models imported from other files are not transformed, as the modifier cannot verify their inheritance chain across file boundaries.
+
 ### check-untracked
 
 Checks for untracked files in specified directories and signals the hook to fail if any are found.
