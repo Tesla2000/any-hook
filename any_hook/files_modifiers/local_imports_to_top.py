@@ -6,7 +6,9 @@ from typing import Literal, NamedTuple, Sequence, Union
 
 from libcst import (
     BaseCompoundStatement,
+    BaseString,
     ClassDef,
+    Expr,
     FunctionDef,
     Import,
     ImportAlias,
@@ -105,6 +107,14 @@ class _LocalImportsToTopTransformer(IgnoreAwareTransformer):
         body: Sequence[Union[SimpleStatementLine, BaseCompoundStatement]],
     ) -> int:
         for i, item in enumerate(body):
+            if (
+                isinstance(item, SimpleStatementLine)
+                and item.body
+                and isinstance(item.body[0], Expr)
+                and isinstance(item.body[0].value, BaseString)
+                and i == 0
+            ):
+                continue
             if not (
                 isinstance(item, SimpleStatementLine)
                 and item.body
