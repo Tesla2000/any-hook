@@ -3,12 +3,11 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from textwrap import dedent
 
-from libcst import parse_module
+from libcst import CSTTransformer, parse_module
 
-from any_hook._file_data import FileData
+from any_hook import FileData
 from any_hook.files_modifiers.return_tuple_parens_drop import (
     ReturnTupleParensDrop,
-    _ReturnTupleParensDropTransformer,
 )
 from tests.modifiers._base import TransformerTestCase
 
@@ -82,7 +81,7 @@ class TestReturnTupleParensDrop(TransformerTestCase):
             content="x = 5",
             module=parse_module("x = 5"),
         )
-        assert modifier._modify_file(file_data) is False
+        assert modifier.modify([file_data]) is False
 
     def test_nested_parens_multiline(self):
         code = dedent("""
@@ -112,9 +111,9 @@ class TestReturnTupleParensDrop(TransformerTestCase):
                 content=code,
                 module=parse_module(code),
             )
-            assert modifier._modify_file(file_data) is True
+            assert modifier.modify([file_data]) is True
 
-    def _create_transformer(self) -> _ReturnTupleParensDropTransformer:
-        return _ReturnTupleParensDropTransformer(
+    def _create_transformer(self) -> CSTTransformer:
+        return ReturnTupleParensDrop().create_transformer(
             re.compile(r"#\s*ignore", re.IGNORECASE)
         )

@@ -3,13 +3,10 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from textwrap import dedent
 
-from libcst import parse_module
+from libcst import CSTTransformer, parse_module
 
-from any_hook._file_data import FileData
-from any_hook.files_modifiers.combine_with import (
-    CombineWith,
-    _CombineWithTransformer,
-)
+from any_hook import FileData
+from any_hook.files_modifiers.combine_with import CombineWith
 from tests.modifiers._base import TransformerTestCase
 
 
@@ -172,7 +169,7 @@ class TestCombineWith(TransformerTestCase):
         code = "with A: pass"
         self._assert_no_transformation(code)
 
-    def _create_transformer(self) -> _CombineWithTransformer:
-        return _CombineWithTransformer(
+    def _create_transformer(self) -> CSTTransformer:
+        return CombineWith().create_transformer(
             re.compile(r"#\s*ignore", re.IGNORECASE)
         )
