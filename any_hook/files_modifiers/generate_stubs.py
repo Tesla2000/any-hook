@@ -1,11 +1,16 @@
 import subprocess
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Literal, NamedTuple
+from typing import TYPE_CHECKING, Literal, NamedTuple
 
 import libcst as cst
 from autoimport import fix_code
-from libcst import CSTTransformer, CSTVisitor, ImportAttribute
+from libcst import CSTTransformer, CSTVisitor
+
+if TYPE_CHECKING:
+    from libcst import ImportAttribute
+else:
+    ImportAttribute = cst.Attribute
 from pydantic import BaseModel, Field, RootModel
 from pydantic_settings import BaseSettings
 
