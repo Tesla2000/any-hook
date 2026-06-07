@@ -1,15 +1,19 @@
 import re
-from typing import Annotated, Literal
+from typing import TYPE_CHECKING, Annotated, Literal
 
 from libcst import (
     Attribute,
     Dot,
     Import,
-    ImportAttribute,
     ImportFrom,
     Name,
 )
 from pydantic import Field
+
+if TYPE_CHECKING:
+    from libcst import ImportAttribute
+else:
+    ImportAttribute = Attribute
 
 from any_hook._file_data import FileData
 from any_hook.files_modifiers._ignore_aware_transformer import (

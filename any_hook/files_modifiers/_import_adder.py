@@ -1,8 +1,9 @@
 from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
 from libcst import (
     BaseCompoundStatement,
-    FromImportAlias,
+    ImportAlias,
     ImportFrom,
     ImportStar,
     MaybeSentinel,
@@ -12,6 +13,11 @@ from libcst import (
 )
 from libcst.helpers import get_absolute_module_for_import
 from pydantic import BaseModel, ConfigDict
+
+if TYPE_CHECKING:
+    from libcst import FromImportAlias
+else:
+    FromImportAlias = ImportAlias
 
 
 class ModuleImportAdder(BaseModel):
