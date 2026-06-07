@@ -1,4 +1,5 @@
 import os
+import subprocess
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from textwrap import dedent
@@ -7,45 +8,10 @@ from unittest.mock import patch
 import libcst as cst
 import pytest
 
-from any_hook._file_data import FileData
-from any_hook.files_modifiers.generate_stubs import (
-    GenerateStubs,
-    _build_registry,
-    _get_name,
-    _has_default,
-    _is_pydantic_module,
-    _module_to_str,
-    _PydanticStubTransformer,
-    _resolve_import_py,
-    _StubCollector,
-    _unwrap_annotated,
-)
+from any_hook import FileData
+from any_hook.files_modifiers.generate_stubs import GenerateStubs
 
 _MODULE = f"{GenerateStubs.__module__}.subprocess.run"
-
-
-def _transform_files(stubs: dict[str, str], target: str) -> str:
-    with TemporaryDirectory() as tmpdir:
-        output_dir = Path(tmpdir)
-        py_files = []
-        for name, content in stubs.items():
-            stub = output_dir / name
-            stub.parent.mkdir(parents=True, exist_ok=True)
-            stub.write_text(content)
-            py = stub.with_suffix(".py")
-            py.write_text(content)
-            py_files.append(py)
-        registry = _build_registry(py_files, output_dir)
-        target_file = output_dir / target
-        return (
-            cst.parse_module(target_file.read_text())
-            .visit(_PydanticStubTransformer(target_file, registry))
-            .code
-        )
-
-
-def _transform(code: str) -> str:
-    return _transform_files({"test.pyi": code}, "test.pyi")
 
 
 def _make_file_data(path: Path) -> FileData:
@@ -55,18 +21,67 @@ def _make_file_data(path: Path) -> FileData:
     )
 
 
+@pytest.fixture
+def transform_files():
+    orig_dir = os.getcwd()
+    with TemporaryDirectory() as tmpdir:
+        os.chdir(tmpdir)
+
+        def run(stubs: dict[str, str], target: str) -> str:
+            output_dir = Path(tmpdir) / "out"
+            for name, content in stubs.items():
+                source = Path("src") / Path(name).with_suffix(".py")
+                source.parent.mkdir(parents=True, exist_ok=True)
+                source.write_text(content)
+
+            def write_stubs(*_: object, **__: object) -> None:
+                for stub_name, stub_content in stubs.items():
+                    stub_path = output_dir / "src" / stub_name
+                    stub_path.parent.mkdir(parents=True, exist_ok=True)
+                    stub_path.write_text(stub_content)
+
+            modifier = GenerateStubs(
+                directories=(Path("src"),), output_dir=output_dir
+            )
+            with patch.object(
+                subprocess, subprocess.run.__name__, side_effect=write_stubs
+            ):
+                modifier.modify(
+                    [
+                        _make_file_data(
+                            Path("src") / Path(name).with_suffix(".py")
+                        )
+                        for name in stubs
+                    ]
+                )
+            return (output_dir / "src" / target).read_text()
+
+        try:
+            yield run
+        finally:
+            os.chdir(orig_dir)
+
+
+@pytest.fixture
+def transform(transform_files):
+    def run(code: str) -> str:
+        return transform_files({"test.pyi": code}, "test.pyi")
+
+    return run
+
+
 class TestPydanticStubTransformer:
-    def test_generates_init_for_required_field(self):
+    def test_generates_init_for_required_field(self, transform):
         code = dedent("""\
             from pydantic import BaseModel
             class User(BaseModel):
                 name: str
         """)
-        assert "def __init__(self, *, name: str) -> None: ..." in _transform(
+        assert "def __init__(self, *, name: str) -> None: ..." in transform(
             code
         )
 
-    def test_generates_init_with_default(self):
+    def test_generates_init_with_default(self, transform):
         code = dedent("""\
             from pydantic import BaseModel
             class User(BaseModel):
@@ -75,20 +90,20 @@ class TestPydanticStubTransformer:
         """)
         assert (
             "def __init__(self, *, name: str, age: int = ...) -> None: ..."
-            in _transform(code)
+            in transform(code)
         )
 
-    def test_field_without_default_treated_as_required(self):
+    def test_field_without_default_treated_as_required(self, transform):
         code = dedent("""\
             from pydantic import BaseModel, Field
             class User(BaseModel):
                 name: str = Field(description="the name")
         """)
-        assert "def __init__(self, *, name: str) -> None: ..." in _transform(
+        assert "def __init__(self, *, name: str) -> None: ..." in transform(
             code
         )
 
-    def test_field_with_default_treated_as_optional(self):
+    def test_field_with_default_treated_as_optional(self, transform):
         code = dedent("""\
             from pydantic import BaseModel, Field
             class User(BaseModel):
@@ -96,10 +111,12 @@ class TestPydanticStubTransformer:
         """)
         assert (
             "def __init__(self, *, name: str = ...) -> None: ..."
-            in _transform(code)
+            in transform(code)
         )
 
-    def test_field_with_positional_default_treated_as_optional(self):
+    def test_field_with_positional_default_treated_as_optional(
+        self, transform
+    ):
         code = dedent("""\
             from pydantic import BaseModel, Field
             class User(BaseModel):
@@ -107,10 +124,10 @@ class TestPydanticStubTransformer:
         """)
         assert (
             "def __init__(self, *, name: str = ...) -> None: ..."
-            in _transform(code)
+            in transform(code)
         )
 
-    def test_field_with_default_factory_treated_as_optional(self):
+    def test_field_with_default_factory_treated_as_optional(self, transform):
         code = dedent("""\
             from pydantic import BaseModel, Field
             class User(BaseModel):
@@ -118,10 +135,12 @@ class TestPydanticStubTransformer:
         """)
         assert (
             "def __init__(self, *, tags: list[str] = ...) -> None: ..."
-            in _transform(code)
+            in transform(code)
         )
 
-    def test_field_without_default_treated_as_required_annotated(self):
+    def test_field_without_default_treated_as_required_annotated(
+        self, transform
+    ):
         code = dedent("""\
             from typing import Annotated
 
@@ -129,11 +148,11 @@ class TestPydanticStubTransformer:
             class User(BaseModel):
                 name: Annotated[str, Field(description="the name")]
         """)
-        assert "def __init__(self, *, name: str) -> None: ..." in _transform(
+        assert "def __init__(self, *, name: str) -> None: ..." in transform(
             code
         )
 
-    def test_field_with_default_treated_as_optional_annotated(self):
+    def test_field_with_default_treated_as_optional_annotated(self, transform):
         code = dedent("""\
             from typing import Annotated
 
@@ -143,10 +162,12 @@ class TestPydanticStubTransformer:
         """)
         assert (
             "def __init__(self, *, name: str = ...) -> None: ..."
-            in _transform(code)
+            in transform(code)
         )
 
-    def test_field_with_positional_default_treated_as_optional_annotated(self):
+    def test_field_with_positional_default_treated_as_optional_annotated(
+        self, transform
+    ):
         code = dedent("""\
             from typing import Annotated
 
@@ -156,10 +177,12 @@ class TestPydanticStubTransformer:
         """)
         assert (
             "def __init__(self, *, name: str = ...) -> None: ..."
-            in _transform(code)
+            in transform(code)
         )
 
-    def test_field_with_default_factory_treated_as_optional_annotated(self):
+    def test_field_with_default_factory_treated_as_optional_annotated(
+        self, transform
+    ):
         code = dedent("""\
             from typing import Annotated
 
@@ -169,10 +192,10 @@ class TestPydanticStubTransformer:
         """)
         assert (
             "def __init__(self, *, tags: list[str] = ...) -> None: ..."
-            in _transform(code)
+            in transform(code)
         )
 
-    def test_excludes_classvar_from_init(self):
+    def test_excludes_classvar_from_init(self, transform):
         code = dedent("""\
             from pydantic import BaseModel
             from typing import ClassVar
@@ -180,22 +203,22 @@ class TestPydanticStubTransformer:
                 model_config: ClassVar[ConfigDict]
                 name: str
         """)
-        result = _transform(code)
+        result = transform(code)
         assert "def __init__(self, *, name: str) -> None: ..." in result
         assert "model_config" not in result.split("def __init__")[1]
 
-    def test_excludes_private_fields_from_init(self):
+    def test_excludes_private_fields_from_init(self, transform):
         code = dedent("""\
             from pydantic import BaseModel
             class User(BaseModel):
                 name: str
                 _private: str
         """)
-        result = _transform(code)
+        result = transform(code)
         assert "def __init__(self, *, name: str) -> None: ..." in result
         assert "_private" not in result.split("def __init__")[1]
 
-    def test_replaces_existing_generic_init(self):
+    def test_replaces_existing_generic_init(self, transform):
         code = dedent("""\
             from pydantic import BaseModel
             from typing import Any
@@ -203,18 +226,18 @@ class TestPydanticStubTransformer:
                 name: str
                 def __init__(self, **data: object) -> None: ...
         """)
-        result = _transform(code)
+        result = transform(code)
         assert "def __init__(self, *, name: str) -> None: ..." in result
         assert "**data" not in result
 
-    def test_non_pydantic_class_unchanged(self):
+    def test_non_pydantic_class_unchanged(self, transform):
         code = dedent("""\
             class Foo:
                 name: str
         """)
-        assert "def __init__" not in _transform(code)
+        assert "def __init__" not in transform(code)
 
-    def test_same_file_inherited_class_includes_parent_fields(self):
+    def test_same_file_inherited_class_includes_parent_fields(self, transform):
         code = dedent("""\
             from pydantic import BaseModel
             class Base(BaseModel):
@@ -222,13 +245,15 @@ class TestPydanticStubTransformer:
             class User(Base):
                 name: str
         """)
-        result = _transform(code)
+        result = transform(code)
         assert "def __init__(self, *, id: int) -> None: ..." in result
         assert (
             "def __init__(self, *, id: int, name: str) -> None: ..." in result
         )
 
-    def test_same_file_deep_inheritance_accumulates_all_ancestor_fields(self):
+    def test_same_file_deep_inheritance_accumulates_all_ancestor_fields(
+        self, transform
+    ):
         code = dedent("""\
             from pydantic import BaseModel
             class A(BaseModel):
@@ -238,7 +263,7 @@ class TestPydanticStubTransformer:
             class C(B):
                 c: float
         """)
-        result = _transform(code)
+        result = transform(code)
         assert "def __init__(self, *, a: int) -> None: ..." in result
         assert "def __init__(self, *, a: int, b: str) -> None: ..." in result
         assert (
@@ -246,7 +271,7 @@ class TestPydanticStubTransformer:
             in result
         )
 
-    def test_cross_file_parent_fields_included(self):
+    def test_cross_file_parent_fields_included(self, transform_files):
         base_stub = dedent("""\
             from pydantic import BaseModel
             class Base(BaseModel):
@@ -257,14 +282,14 @@ class TestPydanticStubTransformer:
             class User(Base):
                 name: str
         """)
-        result = _transform_files(
+        result = transform_files(
             {"base.pyi": base_stub, "user.pyi": user_stub}, "user.pyi"
         )
         assert (
             "def __init__(self, *, id: int, name: str) -> None: ..." in result
         )
 
-    def test_cross_file_relative_import_resolved(self):
+    def test_cross_file_relative_import_resolved(self, transform_files):
         base_stub = dedent("""\
             from pydantic import BaseModel
             class Base(BaseModel):
@@ -275,7 +300,7 @@ class TestPydanticStubTransformer:
             class User(Base):
                 name: str
         """)
-        result = _transform_files(
+        result = transform_files(
             {"pkg/base.pyi": base_stub, "pkg/user.pyi": user_stub},
             "pkg/user.pyi",
         )
@@ -283,7 +308,9 @@ class TestPydanticStubTransformer:
             "def __init__(self, *, id: int, name: str) -> None: ..." in result
         )
 
-    def test_cross_file_relative_import_with_multiple_bases(self):
+    def test_cross_file_relative_import_with_multiple_bases(
+        self, transform_files
+    ):
         base_stub = dedent("""\
             from pydantic import BaseModel
             class Base(BaseModel):
@@ -300,7 +327,7 @@ class TestPydanticStubTransformer:
             class User(Base, Mixin):
                 name: str
         """)
-        result = _transform_files(
+        result = transform_files(
             {
                 "pkg/base.pyi": base_stub,
                 "pkg/mixin.pyi": mixin_stub,
@@ -313,7 +340,9 @@ class TestPydanticStubTransformer:
             in result
         )
 
-    def test_imported_non_pydantic_base_with_pydantic_mixin(self):
+    def test_imported_non_pydantic_base_with_pydantic_mixin(
+        self, transform_files
+    ):
         plain_base = dedent("""\
             class PlainBase:
                 pass
@@ -329,7 +358,7 @@ class TestPydanticStubTransformer:
             class User(PlainBase, Mixin):
                 name: str
         """)
-        result = _transform_files(
+        result = transform_files(
             {
                 "pkg/plain_base.pyi": plain_base,
                 "pkg/mixin.pyi": mixin_stub,
@@ -342,7 +371,7 @@ class TestPydanticStubTransformer:
             in result
         )
 
-    def test_cross_file_multi_level_inheritance(self):
+    def test_cross_file_multi_level_inheritance(self, transform_files):
         a_stub = dedent("""\
             from pydantic import BaseModel
             class A(BaseModel):
@@ -358,7 +387,7 @@ class TestPydanticStubTransformer:
             class C(B):
                 c: float
         """)
-        result = _transform_files(
+        result = transform_files(
             {"a.pyi": a_stub, "b.pyi": b_stub, "c.pyi": c_stub}, "c.pyi"
         )
         assert (
@@ -366,27 +395,27 @@ class TestPydanticStubTransformer:
             in result
         )
 
-    def test_empty_pydantic_model_gets_no_kwonly(self):
+    def test_empty_pydantic_model_gets_no_kwonly(self, transform):
         code = dedent("""\
             from pydantic import BaseModel
             class Empty(BaseModel):
                 pass
         """)
-        result = _transform(code)
+        result = transform(code)
         assert "def __init__(self) -> None: ..." in result
         assert "*," not in result
 
-    def test_base_settings_detected_as_pydantic(self):
+    def test_base_settings_detected_as_pydantic(self, transform):
         code = dedent("""\
             from pydantic import BaseSettings
             class Config(BaseSettings):
                 host: str
         """)
-        assert "def __init__(self, *, host: str) -> None: ..." in _transform(
+        assert "def __init__(self, *, host: str) -> None: ..." in transform(
             code
         )
 
-    def test_complex_annotation_preserved(self):
+    def test_complex_annotation_preserved(self, transform):
         code = dedent("""\
             from pydantic import BaseModel
             from typing import Optional
@@ -395,26 +424,26 @@ class TestPydanticStubTransformer:
         """)
         assert (
             "def __init__(self, *, name: Optional[str]) -> None: ..."
-            in _transform(code)
+            in transform(code)
         )
 
-    def test_pydantic_v1_compat_import_detected(self):
+    def test_pydantic_v1_compat_import_detected(self, transform):
         code = dedent("""\
             from pydantic.v1 import BaseModel
             class User(BaseModel):
                 name: str
         """)
-        assert "def __init__(self, *, name: str) -> None: ..." in _transform(
+        assert "def __init__(self, *, name: str) -> None: ..." in transform(
             code
         )
 
-    def test_aliased_import_detected(self):
+    def test_aliased_import_detected(self, transform):
         code = dedent("""\
             from pydantic import BaseModel as PydModel
             class User(PydModel):
                 name: str
         """)
-        assert "def __init__(self, *, name: str) -> None: ..." in _transform(
+        assert "def __init__(self, *, name: str) -> None: ..." in transform(
             code
         )
 
@@ -654,36 +683,36 @@ class TestGenerateStubs:
             "def __init__(self, *, id: int, name: str) -> None: ..." in result
         )
 
-    def test_import_star_ignored(self):
+    def test_import_star_ignored(self, transform):
         code = dedent("""\
             from pydantic import *
             class User(BaseModel):
                 name: str
         """)
-        result = _transform(code)
+        result = transform(code)
         assert "from pydantic import *" in result
 
-    def test_file_level_annotated_assignment_ignored(self):
+    def test_file_level_annotated_assignment_ignored(self, transform):
         code = dedent("""\
             from pydantic import BaseModel
             x: str = "value"
             class User(BaseModel):
                 name: str
         """)
-        result = _transform(code)
+        result = transform(code)
         assert "x: str = " in result
 
-    def test_attribute_target_annotated_assignment_ignored(self):
+    def test_attribute_target_annotated_assignment_ignored(self, transform):
         code = dedent("""\
             from pydantic import BaseModel
             class User(BaseModel):
                 x.y: str = "value"
                 name: str
         """)
-        result = _transform(code)
+        result = transform(code)
         assert "x.y: str" in result
 
-    def test_circular_import_handling(self):
+    def test_circular_import_handling(self, transform_files):
         stubs = {
             "a.pyi": dedent("""\
                 from pydantic import BaseModel
@@ -698,11 +727,11 @@ class TestGenerateStubs:
                     y: str
             """),
         }
-        result = _transform_files(stubs, "a.pyi")
+        result = transform_files(stubs, "a.pyi")
         assert "class A(B):" in result
         assert "x: int" in result
 
-    def test_missing_imported_file_handled(self):
+    def test_missing_imported_file_handled(self, transform_files):
         stubs = {
             "a.pyi": dedent("""\
                 from pydantic import BaseModel
@@ -711,10 +740,10 @@ class TestGenerateStubs:
                     x: int
             """),
         }
-        result = _transform_files(stubs, "a.pyi")
+        result = transform_files(stubs, "a.pyi")
         assert "class A(Base):" in result
 
-    def test_relative_import_handling(self):
+    def test_relative_import_handling(self, transform_files):
         stubs = {
             "pkg/a.pyi": dedent("""\
                 from pydantic import BaseModel
@@ -728,10 +757,10 @@ class TestGenerateStubs:
                     y: str
             """),
         }
-        result = _transform_files(stubs, "pkg/a.pyi")
+        result = transform_files(stubs, "pkg/a.pyi")
         assert "class A(b.Base):" in result
 
-    def test_multiple_inheritance_levels(self):
+    def test_multiple_inheritance_levels(self, transform_files):
         stubs = {
             "a.pyi": dedent("""\
                 from pydantic import BaseModel
@@ -751,22 +780,22 @@ class TestGenerateStubs:
                     c_field: float
             """),
         }
-        result = _transform_files(stubs, "a.pyi")
+        result = transform_files(stubs, "a.pyi")
         assert "a_field: int" in result
 
-    def test_private_field_excluded_from_init(self):
+    def test_private_field_excluded_from_init(self, transform):
         code = dedent("""\
             from pydantic import BaseModel
             class User(BaseModel):
                 _private: str
                 name: str
         """)
-        result = _transform(code)
+        result = transform(code)
         assert "__init__" in result
         assert "name: str" in result
         assert "_private" not in result or "def __init__" in result
 
-    def test_relative_parent_import_multiple_levels(self):
+    def test_relative_parent_import_multiple_levels(self, transform_files):
         stubs = {
             "pkg/sub/a.pyi": dedent("""\
                 from pydantic import BaseModel
@@ -780,10 +809,10 @@ class TestGenerateStubs:
                     y: str
             """),
         }
-        result = _transform_files(stubs, "pkg/sub/a.pyi")
+        result = transform_files(stubs, "pkg/sub/a.pyi")
         assert "class A(b.Base):" in result
 
-    def test_import_with_asname_tracked(self):
+    def test_import_with_asname_tracked(self, transform_files):
         stubs = {
             "a.pyi": dedent("""\
                 from pydantic import BaseModel as BM
@@ -797,10 +826,10 @@ class TestGenerateStubs:
                     y: str
             """),
         }
-        result = _transform_files(stubs, "a.pyi")
+        result = transform_files(stubs, "a.pyi")
         assert "class A(Base):" in result
 
-    def test_relative_import_with_package_init(self):
+    def test_relative_import_with_package_init(self, transform_files):
         stubs = {
             "pkg/__init__.pyi": dedent("""\
                 from pydantic import BaseModel
@@ -814,10 +843,10 @@ class TestGenerateStubs:
                     y: str
             """),
         }
-        result = _transform_files(stubs, "pkg/a.pyi")
+        result = transform_files(stubs, "pkg/a.pyi")
         assert "class A(Base):" in result
 
-    def test_deeply_nested_relative_imports(self):
+    def test_deeply_nested_relative_imports(self, transform_files):
         stubs = {
             "pkg/a.pyi": dedent("""\
                 from pydantic import BaseModel
@@ -831,48 +860,48 @@ class TestGenerateStubs:
                     y: str
             """),
         }
-        result = _transform_files(stubs, "pkg/sub/deep/b.pyi")
+        result = transform_files(stubs, "pkg/sub/deep/b.pyi")
         assert "class B(Base):" in result
 
-    def test_field_with_default_value(self):
+    def test_field_with_default_value(self, transform):
         code = dedent("""\
             from pydantic import BaseModel, Field
             class User(BaseModel):
                 name: str = Field(default="John")
         """)
-        result = _transform(code)
+        result = transform(code)
         assert "name: str = ..." in result
 
-    def test_field_with_default_factory(self):
+    def test_field_with_default_factory(self, transform):
         code = dedent("""\
             from pydantic import BaseModel, Field
             class User(BaseModel):
                 tags: list = Field(default_factory=list)
         """)
-        result = _transform(code)
+        result = transform(code)
         assert "tags: list = ..." in result
 
-    def test_optional_field_handling(self):
+    def test_optional_field_handling(self, transform):
         code = dedent("""\
             from typing import Optional
             from pydantic import BaseModel
             class User(BaseModel):
                 email: Optional[str] = None
         """)
-        result = _transform(code)
+        result = transform(code)
         assert "email: Optional[str] = ..." in result
 
-    def test_union_type_handling(self):
+    def test_union_type_handling(self, transform):
         code = dedent("""\
             from typing import Union
             from pydantic import BaseModel
             class User(BaseModel):
                 value: Union[int, str]
         """)
-        result = _transform(code)
+        result = transform(code)
         assert "value: Union[int, str]" in result
 
-    def test_generic_type_handling(self):
+    def test_generic_type_handling(self, transform):
         code = dedent("""\
             from typing import List, Dict
             from pydantic import BaseModel
@@ -880,11 +909,11 @@ class TestGenerateStubs:
                 tags: List[str]
                 metadata: Dict[str, int]
         """)
-        result = _transform(code)
+        result = transform(code)
         assert "__init__" in result
         assert "tags: List[str]" in result
 
-    def test_duplicate_imports_handled(self):
+    def test_duplicate_imports_handled(self, transform_files):
         stubs = {
             "a.pyi": dedent("""\
                 from pydantic import BaseModel
@@ -899,10 +928,10 @@ class TestGenerateStubs:
                     y: str
             """),
         }
-        result = _transform_files(stubs, "a.pyi")
+        result = transform_files(stubs, "a.pyi")
         assert "class A(Base):" in result
 
-    def test_relative_import_current_package(self):
+    def test_relative_import_current_package(self, transform_files):
         stubs = {
             "pkg/__init__.pyi": dedent("""\
                 from pydantic import BaseModel
@@ -911,21 +940,21 @@ class TestGenerateStubs:
                     x: int
             """),
         }
-        result = _transform_files(stubs, "pkg/__init__.pyi")
+        result = transform_files(stubs, "pkg/__init__.pyi")
         assert "class A(Base):" in result
 
-    def test_simple_non_field_default_value(self):
+    def test_simple_non_field_default_value(self, transform):
         code = dedent("""\
             from pydantic import BaseModel
             class User(BaseModel):
                 name: str = "John"
                 age: int = 30
         """)
-        result = _transform(code)
+        result = transform(code)
         assert "name: str = ..." in result
         assert "age: int = ..." in result
 
-    def test_attribute_base_class(self):
+    def test_attribute_base_class(self, transform_files):
         stubs = {
             "models/__init__.pyi": dedent("""\
                 from pydantic import BaseModel
@@ -939,10 +968,10 @@ class TestGenerateStubs:
                     y: str
             """),
         }
-        result = _transform_files(stubs, "a.pyi")
+        result = transform_files(stubs, "a.pyi")
         assert "class A(models.Base):" in result
 
-    def test_non_pydantic_base_class(self):
+    def test_non_pydantic_base_class(self, transform):
         code = dedent("""\
             from pydantic import BaseModel
             class CustomBase:
@@ -951,10 +980,10 @@ class TestGenerateStubs:
             class User(CustomBase, BaseModel):
                 name: str
         """)
-        result = _transform(code)
+        result = transform(code)
         assert "class User(CustomBase, BaseModel):" in result
 
-    def test_complex_annotation_types(self):
+    def test_complex_annotation_types(self, transform):
         code = dedent("""\
             from typing import Optional, Callable
             from pydantic import BaseModel
@@ -962,391 +991,350 @@ class TestGenerateStubs:
                 callback: Optional[Callable[[str], int]]
                 data: dict
         """)
-        result = _transform(code)
+        result = transform(code)
         assert "__init__" in result
         assert "callback" in result
 
-    def test_builtin_type_annotation(self):
+    def test_builtin_type_annotation(self, transform):
         code = dedent("""\
             from pydantic import BaseModel
             class User(BaseModel):
                 items: list
                 mapping: dict
         """)
-        result = _transform(code)
+        result = transform(code)
         assert "__init__" in result
         assert "items: list" in result
 
-    def test_alias_name_not_cst_name(self):
+    def test_alias_name_not_cst_name(self, transform):
         code = dedent("""\
             from pydantic import BaseModel as *
         """)
-        try:
-            _transform(code)
-        except Exception:
-            pass
+        with pytest.raises(cst.ParserSyntaxError):
+            transform(code)
 
-    def test_relative_import_with_package(self):
-        with TemporaryDirectory() as tmpdir:
-            output_dir = Path(tmpdir)
-            package_dir = output_dir / "mypackage"
-            package_dir.mkdir()
-            (package_dir / "__init__.py").write_text(dedent("""\
+    def test_relative_import_with_package(self, transform_files):
+        stubs = {
+            "mypackage/__init__.pyi": dedent("""\
                 from pydantic import BaseModel
                 class Base(BaseModel):
                     id: int
-            """))
-            child_file = package_dir / "child.py"
-            child_file.write_text(dedent("""\
+            """),
+            "mypackage/child.pyi": dedent("""\
                 from . import Base
                 from pydantic import BaseModel
                 class User(BaseModel, Base):
                     name: str
-            """))
-            registry = _build_registry([child_file], output_dir)
-            transformer = _PydanticStubTransformer(
-                output_dir / "mypackage" / "child.pyi", registry
-            )
-            code = dedent("""\
+            """),
+        }
+        result = transform_files(stubs, "mypackage/child.pyi")
+        assert "__init__" in result
+
+    def test_get_name_ignores_call_bases_and_subscript_bases(self, transform):
+        code = dedent("""\
+            from pydantic import BaseModel
+            def get_base():
+                return BaseModel
+            class User(get_base()):
+                name: str
+        """)
+        result = transform(code)
+        assert "class User(get_base()):" in result
+
+    def test_module_to_str_with_relative_import(self, transform_files):
+        stubs = {
+            "pkg/__init__.pyi": dedent("""\
+                from pydantic import BaseModel
+                class Base(BaseModel):
+                    x: int
+            """),
+            "pkg/a.pyi": dedent("""\
                 from . import Base
                 from pydantic import BaseModel
-                class User(BaseModel, Base):
-                    name: str
-            """)
-            result = cst.parse_module(code).visit(transformer).code
-            assert "__init__" in result
+                class A(Base):
+                    y: str
+            """),
+        }
+        result = transform_files(stubs, "pkg/a.pyi")
+        assert "class A(Base):" in result
 
-    def test_fallback_get_name_with_invalid_type(self):
-
-        subscript = cst.Subscript(
-            value=cst.Name("List"),
-            slice=[
-                cst.SubscriptElement(slice=cst.Index(value=cst.Name("str")))
-            ],
-        )
-        assert _get_name(subscript) == ""
-
-    def test_fallback_module_to_str_with_invalid_type(self):
-
-        subscript = cst.Subscript(
-            value=cst.Name("List"),
-            slice=[
-                cst.SubscriptElement(slice=cst.Index(value=cst.Name("str")))
-            ],
-        )
-        assert _module_to_str(subscript) == ""
-
-    def test_fallback_is_pydantic_module_with_invalid_type(self):
-
-        subscript = cst.Subscript(
-            value=cst.Name("List"),
-            slice=[
-                cst.SubscriptElement(slice=cst.Index(value=cst.Name("str")))
-            ],
-        )
-        assert _is_pydantic_module(subscript) is False
-
-    def test_circular_inheritance_between_files(self):
-        with TemporaryDirectory() as tmpdir:
-            output_dir = Path(tmpdir)
-            file_a = output_dir / "a.py"
-            file_b = output_dir / "b.py"
-            file_a.write_text(dedent("""\
+    def test_circular_inheritance_between_files(self, transform_files):
+        stubs = {
+            "a.pyi": dedent("""\
                 from pydantic import BaseModel
                 from b import BModel
                 class AModel(BaseModel):
                     name: str
                     ref: BModel = None
-            """))
-            file_b.write_text(dedent("""\
+            """),
+            "b.pyi": dedent("""\
                 from pydantic import BaseModel
                 from a import AModel
                 class BModel(BaseModel):
                     id: int
                     ref: AModel = None
-            """))
-            registry = _build_registry([file_a, file_b], output_dir)
-            assert len(registry) > 0
+            """),
+        }
+        result = transform_files(stubs, "a.pyi")
+        assert "def __init__" in result
 
-    def test_annotated_with_non_subscript_element_inner(self):
+    def test_annotated_with_non_subscript_element_inner(self, transform):
         code = dedent("""\
             from typing import Annotated
             from pydantic import BaseModel
             class User(BaseModel):
                 name: Annotated[str, "some metadata"]
         """)
-        result = _transform(code)
+        result = transform(code)
         assert "__init__" in result
 
-    def test_annotated_with_malformed_field_slice(self):
+    def test_annotated_with_malformed_field_slice(self, transform):
         code = dedent("""\
             from typing import Annotated
             from pydantic import BaseModel, Field
             class User(BaseModel):
                 name: Annotated[str, "not a field"]
         """)
-        result = _transform(code)
+        result = transform(code)
         assert "__init__" in result
 
-    def test_pydantic_class_with_non_indented_block_in_transformer(self):
+    def test_pydantic_class_with_non_indented_block_in_transformer(
+        self, transform
+    ):
         code = dedent("""\
             from pydantic import BaseModel
             class User(BaseModel): pass
         """)
-        result = _transform(code)
+        result = transform(code)
         assert "class User(BaseModel): pass" in result
 
-    def test_annotated_unwrap_with_simple_metadata(self):
+    def test_annotated_unwrap_with_simple_metadata(self, transform):
+        code = dedent("""\
+            from typing import Annotated
+            from pydantic import BaseModel
+            METADATA = object()
+            class User(BaseModel):
+                name: Annotated[str, METADATA]
+        """)
+        assert transform(code) == dedent("""\
+            from typing import Annotated
+            from pydantic import BaseModel
 
-        ann = cst.Subscript(
-            value=cst.Name("Annotated"),
-            slice=[
-                cst.SubscriptElement(slice=cst.Index(value=cst.Name("str"))),
-                cst.SubscriptElement(
-                    slice=cst.Index(value=cst.Name("metadata"))
-                ),
-            ],
-        )
-        inner_type, has_default = _unwrap_annotated(ann, None)
-        assert inner_type is not None
-        assert not has_default
 
-    def test_has_default_with_non_field_call(self):
+            METADATA = object()
+            class User(BaseModel):
+                name: Annotated[str, METADATA]
+                def __init__(self, *, name: str) -> None: ...
+        """)
 
-        call = cst.Call(func=cst.Name("SomeOtherCall"), args=[])
-        assert _has_default(call)
+    def test_has_default_with_non_field_call(self, transform):
+        code = dedent("""\
+            from pydantic import BaseModel
+            def make_default():
+                return "x"
+            class User(BaseModel):
+                name: str = make_default()
+        """)
+        assert transform(code) == dedent("""\
+            from pydantic import BaseModel
 
-    def test_is_pydantic_module_with_subscript(self):
 
-        subscript = cst.Subscript(
-            value=cst.Name("pydantic"),
-            slice=[
-                cst.SubscriptElement(slice=cst.Index(value=cst.Name("v1")))
-            ],
-        )
-        assert not _is_pydantic_module(subscript)
+            def make_default():
+                return "x"
+            class User(BaseModel):
+                name: str = make_default()
+                def __init__(self, *, name: str = ...) -> None: ...
+        """)
 
-    def test_get_name_with_call_node_in_class_bases(self):
+    def test_is_pydantic_module_with_attribute_chain(self, transform):
+        code = dedent("""\
+            from pydantic.v1 import BaseModel
+            class User(BaseModel):
+                name: str
+        """)
+        assert transform(code) == dedent("""\
+            from pydantic.v1 import BaseModel
 
-        code = "class Foo(get_base()): pass"
-        module = cst.parse_module(code)
-        class_def = module.body[0]
-        base_expr = class_def.bases[0].value
-        assert isinstance(base_expr, cst.Call)
-        result = _get_name(base_expr)
-        assert result == ""
 
-    def test_module_to_str_with_call_node(self):
+            class User(BaseModel):
+                name: str
+                def __init__(self, *, name: str) -> None: ...
+        """)
 
-        call = cst.Call(func=cst.Name("get_module"))
-        result = _module_to_str(call)
-        assert result == ""
+    def test_module_to_str_with_attribute_chain(self, transform_files):
+        stubs = {
+            "a/b/c.pyi": dedent("""\
+                from pydantic import BaseModel
+                class Base(BaseModel):
+                    x: int
+            """),
+            "user.pyi": dedent("""\
+                from a.b.c import Base
+                class User(Base):
+                    y: str
+            """),
+        }
+        assert transform_files(stubs, "user.pyi") == dedent("""\
+            from a.b.c import Base
 
-    def test_is_pydantic_module_with_call_node(self):
 
-        call = cst.Call(func=cst.Name("pydantic_factory"))
-        assert not _is_pydantic_module(call)
+            class User(Base):
+                y: str
+                def __init__(self, *, x: int, y: str) -> None: ...
+        """)
 
-    def test_is_pydantic_module_with_subscript_falls_through(self):
+    def test_get_name_with_nested_attribute(self, transform_files):
+        stubs = {
+            "models/__init__.pyi": dedent("""\
+                from pydantic import BaseModel
+                class Base(BaseModel):
+                    x: int
+            """),
+            "a.pyi": dedent("""\
+                import models
+                class A(models.Base):
+                    y: str
+            """),
+        }
+        assert transform_files(stubs, "a.pyi") == dedent("""\
+            import models
 
-        subscript = cst.Subscript(
-            value=cst.Name("pydantic"),
-            slice=[
-                cst.SubscriptElement(slice=cst.Index(value=cst.Name("v1")))
-            ],
-        )
-        assert not _is_pydantic_module(subscript)
 
-    def test_is_pydantic_module_with_binary_operation(self):
+            class A(models.Base):
+                y: str
+        """)
 
-        binary_op = cst.BinaryOperation(
-            left=cst.Name("pydantic"), operator=cst.Add(), right=cst.Name("v1")
-        )
-        assert not _is_pydantic_module(binary_op)
-
-    def test_is_pydantic_module_with_none(self):
-
-        assert not _is_pydantic_module(None)
-
-    def test_circular_inheritance_with_circular_ref(self):
-        with TemporaryDirectory() as tmpdir:
-            output_dir = Path(tmpdir)
-            file_a = output_dir / "a.py"
-            file_a.write_text(dedent("""\
+    def test_circular_inheritance_with_circular_ref(self, transform_files):
+        stubs = {
+            "a.pyi": dedent("""\
                 from pydantic import BaseModel
                 from a import AModel
                 class AModel(BaseModel):
                     name: str
-            """))
-            registry = _build_registry([file_a], output_dir)
-            assert len(registry) > 0
+            """),
+        }
+        result = transform_files(stubs, "a.pyi")
+        assert "def __init__" in result
 
-    def test_resolve_import_py_with_empty_module_str(self):
+    def test_resolve_import_py_with_nonexistent_module(self, transform_files):
+        stubs = {
+            "user.pyi": dedent("""\
+                from nonexistent import Base
+                class User(Base):
+                    name: str
+            """),
+        }
+        assert transform_files(stubs, "user.pyi") == dedent("""\
+            from nonexistent import Base
 
-        result = _resolve_import_py(Path("test.py"), "", 0)
-        assert result is None
 
-    def test_resolve_import_py_with_relative_empty_module(self):
+            class User(Base):
+                name: str
+        """)
 
-        with TemporaryDirectory() as tmpdir:
-            pkg_dir = Path(tmpdir) / "mypackage"
-            pkg_dir.mkdir()
-            (pkg_dir / "__init__.py").touch()
-            current_file = pkg_dir / "module.py"
-            current_file.touch()
+    def test_resolve_import_py_with_relative_init(self, transform_files):
+        stubs = {
+            "pkg/__init__.pyi": dedent("""\
+                from pydantic import BaseModel
+                class Base(BaseModel):
+                    x: int
+            """),
+            "pkg/child.pyi": dedent("""\
+                from . import Base
+                class Child(Base):
+                    y: str
+            """),
+        }
+        assert transform_files(stubs, "pkg/child.pyi") == dedent("""\
+            from . import Base
 
-            result = _resolve_import_py(current_file, "", 1)
-            assert result is not None
-            assert result.name == "__init__.py"
 
-    def test_unwrap_annotated_with_non_index_slice(self):
+            class Child(Base):
+                y: str
+                def __init__(self, *, x: int, y: str) -> None: ...
+        """)
 
-        ann = cst.Subscript(
-            value=cst.Name("Annotated"),
-            slice=[
-                cst.SubscriptElement(
-                    slice=cst.Slice(
-                        lower=cst.Name("str"), upper=None, step=None
-                    )
-                ),
-                cst.SubscriptElement(
-                    slice=cst.Index(value=cst.Name("metadata"))
-                ),
-            ],
-        )
-        inner_type, has_default = _unwrap_annotated(ann, None)
-        assert inner_type == ann
-        assert not has_default
+    def test_unwrap_annotated_with_non_index_slice(self, transform):
+        code = dedent("""\
+            from typing import Annotated
+            from pydantic import BaseModel
+            class User(BaseModel):
+                name: Annotated[str:, int]
+        """)
+        assert transform(code) == dedent("""\
+            from typing import Annotated
+            from pydantic import BaseModel
 
-    def test_unwrap_annotated_field_not_index_slice(self):
 
-        ann = cst.Subscript(
-            value=cst.Name("Annotated"),
-            slice=[
-                cst.SubscriptElement(slice=cst.Index(value=cst.Name("str"))),
-                cst.SubscriptElement(
-                    slice=cst.Slice(
-                        lower=cst.Name("Field"), upper=None, step=None
-                    )
-                ),
-            ],
-        )
-        inner_type, has_default = _unwrap_annotated(ann, None)
-        assert isinstance(inner_type, cst.Name)
-        assert inner_type.value == "str"
-        assert not has_default
+            class User(BaseModel):
+                name: Annotated[str:, int]
+                def __init__(self, *, name: Annotated[str:, int]) -> None: ...
+        """)
 
-    def test_alias_name_is_attribute_skip(self):
+    def test_unwrap_annotated_field_not_index_slice(self, transform):
+        code = dedent("""\
+            from typing import Annotated
+            from pydantic import BaseModel, Field
+            class User(BaseModel):
+                name: Annotated[str, Field:]
+        """)
+        assert transform(code) == dedent("""\
+            from typing import Annotated
+            from pydantic import BaseModel, Field
 
-        file_collector = _StubCollector(Path("test.py"))
-        attr = cst.Attribute(value=cst.Name("module"), attr=cst.Name("Class"))
-        alias = cst.ImportAlias(name=attr)
-        import_stmt = cst.ImportFrom(module=cst.Name("x"), names=[alias])
-        file_collector.visit_ImportFrom(import_stmt)
-        assert len(file_collector.imports) == 0
 
-    def test_module_to_str_with_attribute_chain(self):
+            class User(BaseModel):
+                name: Annotated[str, Field:]
+                def __init__(self, *, name: str) -> None: ...
+        """)
 
-        attr = cst.Attribute(
-            value=cst.Attribute(value=cst.Name("a"), attr=cst.Name("b")),
-            attr=cst.Name("c"),
-        )
-        result = _module_to_str(attr)
-        assert result == "a.b.c"
-
-    def test_is_pydantic_module_with_attribute_chain(self):
-
-        attr = cst.Attribute(
-            value=cst.Attribute(
-                value=cst.Name("pydantic"), attr=cst.Name("v1")
-            ),
-            attr=cst.Name("BaseModel"),
-        )
-        assert _is_pydantic_module(attr)
-
-    def test_get_name_with_nested_attribute(self):
-
-        attr = cst.Attribute(
-            value=cst.Attribute(value=cst.Name("a"), attr=cst.Name("b")),
-            attr=cst.Name("c"),
-        )
-        result = _get_name(attr)
-        assert result == "c"
-
-    def test_imported_pydantic_base_class(self):
-        with TemporaryDirectory() as tmpdir:
-            output_dir = Path(tmpdir)
-            base_file = output_dir / "base.py"
-            base_file.write_text(dedent("""\
+    def test_imported_pydantic_base_class(self, transform_files):
+        stubs = {
+            "base.pyi": dedent("""\
                 from pydantic import BaseModel
                 class BaseModel2(BaseModel):
                     x: int
-            """))
-            child_file = output_dir / "child.py"
-            child_file.write_text(dedent("""\
+            """),
+            "child.pyi": dedent("""\
                 from pydantic import BaseModel
                 from base import BaseModel2
                 class Child(BaseModel2):
                     y: int
-            """))
-            registry = _build_registry([base_file, child_file], output_dir)
-            assert len(registry) > 0
+            """),
+        }
+        result = transform_files(stubs, "child.pyi")
+        assert "def __init__(self, *, x: int, y: int) -> None: ..." in result
 
-    def test_truly_circular_base_inheritance(self):
-        with TemporaryDirectory() as tmpdir:
-            output_dir = Path(tmpdir)
-            file_a = output_dir / "a.py"
-            file_a.write_text(dedent("""\
+    def test_truly_circular_base_inheritance(self, transform_files):
+        stubs = {
+            "a.pyi": dedent("""\
                 from pydantic import BaseModel
                 from b import B
                 class A(BaseModel, B):
                     x: int
-            """))
-            file_b = output_dir / "b.py"
-            file_b.write_text(dedent("""\
+            """),
+            "b.pyi": dedent("""\
                 from pydantic import BaseModel
                 from a import A
                 class B(BaseModel, A):
                     y: int
-            """))
-            file_a_py = output_dir / "a.py"
-            file_b_py = output_dir / "b.py"
-            try:
-                registry = _build_registry([file_a_py, file_b_py], output_dir)
-                assert len(registry) > 0
-            except (ImportError, AttributeError):
-                pass
+            """),
+        }
+        result = transform_files(stubs, "a.pyi")
+        assert "def __init__" in result
 
-    def test_resolve_fields_with_imported_pydantic_base(self):
-        with TemporaryDirectory() as tmpdir:
-            output_dir = Path(tmpdir)
-            file_a = output_dir / "a.py"
-            file_a.write_text(dedent("""\
+    def test_resolve_fields_with_imported_pydantic_base(self, transform_files):
+        stubs = {
+            "a.pyi": dedent("""\
                 from pydantic import BaseModel
                 class A(BaseModel):
                     x: int
-            """))
-            file_b = output_dir / "b.py"
-            file_b.write_text(dedent("""\
+            """),
+            "b.pyi": dedent("""\
                 from a import A
                 class B(A):
                     y: int
-            """))
-            registry = _build_registry([file_a, file_b], output_dir)
-            assert len(registry) > 0
-
-            a_pyi = output_dir / "a.pyi"
-            b_pyi = output_dir / "b.pyi"
-
-            a_key_found = False
-            b_key_found = False
-            for key in registry:
-                if key.file == a_pyi and key.name == "A":
-                    a_key_found = True
-                if key.file == b_pyi and key.name == "B":
-                    b_key_found = True
-
-            assert a_key_found, "A should be in registry"
-            assert (
-                b_key_found
-            ), "B should be in registry and trigger resolve_fields for imported A"
+            """),
+        }
+        result = transform_files(stubs, "b.pyi")
+        assert "def __init__(self, *, x: int, y: int) -> None: ..." in result

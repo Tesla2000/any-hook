@@ -3,14 +3,10 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from textwrap import dedent
 
-from libcst import parse_module
+from libcst import CSTTransformer, parse_module
 
-from any_hook._file_data import FileData
-from any_hook.files_modifiers._import_adder import ModuleImportAdder
-from any_hook.files_modifiers.open_to_path import (
-    OpenToPath,
-    _OpenToPathTransformer,
-)
+from any_hook import FileData
+from any_hook.files_modifiers.open_to_path import OpenToPath
 from tests.modifiers._base import TransformerTestCase
 
 
@@ -690,7 +686,7 @@ class TestOpenToPath(TransformerTestCase):
         """).lstrip()
         self._assert_no_transformation(code)
 
-    def _create_transformer(self) -> _OpenToPathTransformer:
-        return _OpenToPathTransformer(
-            re.compile(r"#\s*ignore", re.IGNORECASE), ModuleImportAdder()
+    def _create_transformer(self) -> CSTTransformer:
+        return OpenToPath().create_transformer(
+            re.compile(r"#\s*ignore", re.IGNORECASE)
         )

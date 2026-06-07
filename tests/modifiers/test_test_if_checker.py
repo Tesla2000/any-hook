@@ -4,7 +4,7 @@ from textwrap import dedent
 
 from libcst import parse_module
 
-from any_hook._file_data import FileData
+from any_hook import FileData
 from any_hook.files_modifiers.test_if_checker import TestIfChecker
 
 

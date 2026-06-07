@@ -41,7 +41,7 @@ repos:
         additional_dependencies:
            - pydantic
            - pydantic-settings
-           - libcst
+           - libcst @ git+https://github.com/Tesla2000/LibCST
            - types-PyYAML
            - autoimport
            - subclass_getter

@@ -3,14 +3,10 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from textwrap import dedent
 
-from libcst import parse_module
+from libcst import CSTTransformer, parse_module
 
-from any_hook._file_data import FileData
-from any_hook.files_modifiers._import_adder import ModuleImportAdder
-from any_hook.files_modifiers.object_to_any import (
-    ObjectToAny,
-    _ObjectToAnyTransformer,
-)
+from any_hook import FileData
+from any_hook.files_modifiers.object_to_any import ObjectToAny
 from tests.modifiers._base import TransformerTestCase
 
 
@@ -223,7 +219,7 @@ class TestObjectToAny(TransformerTestCase):
                 content=code,
                 module=parse_module(code),
             )
-            assert modifier._modify_file(file_data) is True
+            assert modifier.modify([file_data]) is True
 
     def test_skip_modify_file_without_object(self):
 
@@ -233,7 +229,7 @@ class TestObjectToAny(TransformerTestCase):
             content="x = 5",
             module=parse_module("x = 5"),
         )
-        assert modifier._modify_file(file_data) is False
+        assert modifier.modify([file_data]) is False
 
     def test_object_from_non_typing_not_changed(self):
         code = dedent("""
@@ -242,7 +238,7 @@ class TestObjectToAny(TransformerTestCase):
         """).lstrip()
         self._assert_no_transformation(code)
 
-    def _create_transformer(self) -> _ObjectToAnyTransformer:
-        return _ObjectToAnyTransformer(
-            re.compile(r"#\s*ignore", re.IGNORECASE), ModuleImportAdder()
+    def _create_transformer(self) -> CSTTransformer:
+        return ObjectToAny().create_transformer(
+            re.compile(r"#\s*ignore", re.IGNORECASE)
         )

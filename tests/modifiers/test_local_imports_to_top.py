@@ -7,13 +7,10 @@ from tempfile import TemporaryDirectory
 from textwrap import dedent
 from unittest.mock import MagicMock, patch
 
-from libcst import Import, ImportAlias, Name, SimpleStatementLine, parse_module
+from libcst import CSTTransformer, parse_module
 
-from any_hook._file_data import FileData
-from any_hook.files_modifiers.local_imports_to_top import (
-    LocalImportsToTop,
-    _LocalImportsToTopTransformer,
-)
+from any_hook import FileData
+from any_hook.files_modifiers.local_imports_to_top import LocalImportsToTop
 from tests.modifiers._base import TransformerTestCase
 
 
@@ -202,9 +199,9 @@ class TestLocalImportsToTop(TransformerTestCase):
             def process():
                 return config.DEBUG
         """).lstrip()
-        transformer = _LocalImportsToTopTransformer(
-            re.compile(r"#\s*ignore", re.IGNORECASE), include_src_imports=True
-        )
+        transformer = LocalImportsToTop(
+            include_src_imports=True
+        ).create_transformer(re.compile(r"#\s*ignore", re.IGNORECASE))
         module = parse_module(code)
         result = module.visit(transformer)
         assert result.code == expected
@@ -353,9 +350,9 @@ class TestLocalImportsToTop(TransformerTestCase):
             def process():
                 return json.dumps({})
         """).lstrip()
-        transformer = _LocalImportsToTopTransformer(
-            re.compile(r"#\s*ignore", re.IGNORECASE), include_src_imports=False
-        )
+        transformer = LocalImportsToTop(
+            include_src_imports=False
+        ).create_transformer(re.compile(r"#\s*ignore", re.IGNORECASE))
         module = parse_module(code)
         result = module.visit(transformer)
         assert result.code == expected
@@ -371,9 +368,9 @@ class TestLocalImportsToTop(TransformerTestCase):
             def process():
                 return requests.get("https://example.com")
         """).lstrip()
-        transformer = _LocalImportsToTopTransformer(
-            re.compile(r"#\s*ignore", re.IGNORECASE), include_src_imports=False
-        )
+        transformer = LocalImportsToTop(
+            include_src_imports=False
+        ).create_transformer(re.compile(r"#\s*ignore", re.IGNORECASE))
         module = parse_module(code)
         result = module.visit(transformer)
         assert result.code == expected
@@ -436,10 +433,9 @@ class TestLocalImportsToTop(TransformerTestCase):
                     def process():
                         return utils.foo()
                 """).lstrip()
-                transformer = _LocalImportsToTopTransformer(
-                    re.compile(r"#\s*ignore", re.IGNORECASE),
-                    include_src_imports=True,
-                )
+                transformer = LocalImportsToTop(
+                    include_src_imports=True
+                ).create_transformer(re.compile(r"#\s*ignore", re.IGNORECASE))
                 module = parse_module(code)
                 result = module.visit(transformer)
                 assert result.code == expected
@@ -678,9 +674,9 @@ class TestLocalImportsToTop(TransformerTestCase):
                 from .. import config
                 return config.DEBUG
         """).lstrip()
-        transformer = _LocalImportsToTopTransformer(
-            re.compile(r"#\s*ignore", re.IGNORECASE), include_src_imports=True
-        )
+        transformer = LocalImportsToTop(
+            include_src_imports=True
+        ).create_transformer(re.compile(r"#\s*ignore", re.IGNORECASE))
         module = parse_module(code)
         result = module.visit(transformer)
         expected = dedent("""
@@ -1035,9 +1031,9 @@ class TestLocalImportsToTop(TransformerTestCase):
             def process():
                 return utils.foo()
         """).lstrip()
-        transformer = _LocalImportsToTopTransformer(
-            re.compile(r"#\s*ignore", re.IGNORECASE), include_src_imports=True
-        )
+        transformer = LocalImportsToTop(
+            include_src_imports=True
+        ).create_transformer(re.compile(r"#\s*ignore", re.IGNORECASE))
         module = parse_module(code)
         result = module.visit(transformer)
         assert result.code == expected
@@ -1230,9 +1226,9 @@ class TestLocalImportsToTop(TransformerTestCase):
             def process():
                 return utils.foo()
         """).lstrip()
-        transformer = _LocalImportsToTopTransformer(
-            re.compile(r"#\s*ignore", re.IGNORECASE), include_src_imports=True
-        )
+        transformer = LocalImportsToTop(
+            include_src_imports=True
+        ).create_transformer(re.compile(r"#\s*ignore", re.IGNORECASE))
         module = parse_module(code)
         assert module.visit(transformer).code == expected
 
@@ -1243,12 +1239,15 @@ class TestLocalImportsToTop(TransformerTestCase):
                 from . import utils
                 return utils.foo()
         """).lstrip()
-        transformer = _LocalImportsToTopTransformer(
-            re.compile(r"#\s*ignore", re.IGNORECASE), include_src_imports=True
-        )
-        module = parse_module(code)
-        module.visit(transformer)
-        assert "from . import utils" in transformer._top_level_import_codes
+        expected = dedent("""
+            from . import utils
+            def process():
+                return utils.foo()
+        """).lstrip()
+        transformer = LocalImportsToTop(
+            include_src_imports=True
+        ).create_transformer(re.compile(r"#\s*ignore", re.IGNORECASE))
+        assert parse_module(code).visit(transformer).code == expected
 
     def test_multiple_external_imports_in_statement(self):
         code = dedent("""
@@ -1263,14 +1262,22 @@ class TestLocalImportsToTop(TransformerTestCase):
         """).lstrip()
         self._assert_transformation(code, expected)
 
-    def test_find_insertion_point_returns_len_body_all_imports(self):
-
-        transformer = self._create_transformer()
-        import_stmt = Import(names=[ImportAlias(name=Name(value="os"))])
-        line = SimpleStatementLine(body=[import_stmt])
-        body = [line, line]
-        result = transformer._find_import_insertion_point(body)
-        assert result == 2
+    def test_local_import_inserted_after_existing_top_level_imports(self):
+        code = dedent("""
+            import os
+            import sys
+            def process():
+                import json
+                return json.dumps({"cwd": os.getcwd(), "argv": sys.argv})
+        """).lstrip()
+        expected = dedent("""
+            import os
+            import sys
+            import json
+            def process():
+                return json.dumps({"cwd": os.getcwd(), "argv": sys.argv})
+        """).lstrip()
+        self._assert_transformation(code, expected)
 
     def test_spec_origin_none_treated_as_external(self):
 
@@ -1345,12 +1352,7 @@ class TestLocalImportsToTop(TransformerTestCase):
             def process():
                 return os.path.exists("/tmp")
         """).lstrip()
-        module = parse_module(code)
-        transformer = self._create_transformer()
-        result = module.visit(transformer)
-        assert result.code == expected
-        assert "os.path" not in transformer._top_level_imports
-        assert "os" not in transformer._top_level_imports
+        self._assert_transformation(code, expected)
 
     def test_path_resolve_raises_value_error(self):
 
@@ -1475,10 +1477,9 @@ class TestLocalImportsToTop(TransformerTestCase):
                     def process():
                         return u.foo()
                 """).lstrip()
-                transformer = _LocalImportsToTopTransformer(
-                    re.compile(r"#\s*ignore", re.IGNORECASE),
-                    include_src_imports=True,
-                )
+                transformer = LocalImportsToTop(
+                    include_src_imports=True
+                ).create_transformer(re.compile(r"#\s*ignore", re.IGNORECASE))
                 module = parse_module(code)
                 result = module.visit(transformer)
                 assert result.code == expected
@@ -1577,8 +1578,7 @@ class TestLocalImportsToTop(TransformerTestCase):
         """).lstrip()
         self._assert_transformation(code, expected)
 
-    def _create_transformer(self) -> _LocalImportsToTopTransformer:
-        return _LocalImportsToTopTransformer(
-            re.compile(r"#\s*ignore", re.IGNORECASE),
-            include_src_imports=False,
+    def _create_transformer(self) -> CSTTransformer:
+        return LocalImportsToTop(include_src_imports=False).create_transformer(
+            re.compile(r"#\s*ignore", re.IGNORECASE)
         )

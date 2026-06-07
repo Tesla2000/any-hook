@@ -1,3 +1,4 @@
+import json
 import sys
 import tempfile
 from pathlib import Path
@@ -6,73 +7,69 @@ import pytest
 from libcst import parse_module
 from pydantic import ValidationError
 
-from any_hook import main
+from any_hook import FileData, main
 from any_hook.__main__ import Main
-from any_hook._file_data import FileData
-from any_hook._transaction import transaction
-from any_hook.files_modifiers._import_adder import ModuleImportAdder
 from any_hook.files_modifiers.remove_f_prefix import RemoveFPrefix
 
 
-def test_transaction_success():
-    with tempfile.TemporaryDirectory() as tmpdir:
-        test_dir = Path(tmpdir)
-        file1 = test_dir / "test1.py"
-        file2 = test_dir / "test2.txt"
-        file1.write_text("original1")
-        file2.write_text("original2")
-
-        with transaction([file1, file2]) as (paths, contents):
-            paths_list = list(paths)
-            contents_list = list(contents)
-            assert len(paths_list) == 1
-            assert paths_list[0] == file1
-            assert contents_list[0] == "original1"
-            file1.write_text("modified1")
-
-        assert file1.read_text() == "modified1"
-
-
-def test_transaction_revert_on_exception(capsys):
-    with tempfile.TemporaryDirectory() as tmpdir:
-        test_dir = Path(tmpdir)
-        file1 = test_dir / "test1.py"
-        file2 = test_dir / "test2.py"
-        file1.write_text("original1")
-        file2.write_text("original2")
-
-        def process_files(path, content):
-            if "test2" in str(path):
-                raise ValueError("test error")
-            return (path, content)
-
-        try:
-            with transaction([file1, file2]) as (paths, contents):
-                tuple(map(process_files, paths, contents))
-        except ValueError:
-            pass
-
-        assert file1.read_text() == "original1"
-        assert file2.read_text() == "original2"
-        captured = capsys.readouterr()
-        assert "Reverting changes" in captured.out
-        assert "Changes reverted" in captured.out
+def _run_main(
+    paths: list[Path], modifiers: list[dict], convert_to_agito: bool = True
+) -> None:
+    original_argv = sys.argv
+    try:
+        sys.argv = [
+            "any-hook",
+            *map(str, paths),
+            "--modifiers",
+            json.dumps(modifiers),
+            "--convert_to_agito",
+            str(convert_to_agito),
+        ]
+        main()
+    finally:
+        sys.argv = original_argv
 
 
-def test_transaction_filters_non_py_files():
+def test_transaction_success_and_filters_non_py_via_main():
     with tempfile.TemporaryDirectory() as tmpdir:
         test_dir = Path(tmpdir)
         py_file = test_dir / "test.py"
         txt_file = test_dir / "test.txt"
-        py_file.write_text("python code")
-        txt_file.write_text("text content")
+        py_file.write_text("x = f'hello'")
+        txt_original = "text content"
+        txt_file.write_text(txt_original)
+        _run_main([py_file, txt_file], [{"type": "remove-f-prefix"}])
+        assert py_file.read_text() == "x = 'hello'"
+        assert txt_file.read_text() == txt_original
 
-        with transaction([py_file, txt_file]) as (paths, contents):
-            paths_list = list(paths)
-            contents_list = list(contents)
-            assert len(paths_list) == 1
-            assert paths_list[0] == py_file
-            assert contents_list[0] == "python code"
+
+def test_transaction_revert_on_exception_via_main(capsys):
+    with tempfile.TemporaryDirectory() as tmpdir:
+        test_dir = Path(tmpdir)
+        f_string_file = test_dir / "f_string.py"
+        conflict_file = test_dir / "conflict.py"
+        f_string_original = "x = f'hello'"
+        conflict_original = (
+            "from pydantic import BaseModel, ConfigDict\n"
+            "class Foo(BaseModel, frozen=True):\n"
+            "    model_config = ConfigDict(frozen=False)\n"
+        )
+        f_string_file.write_text(f_string_original)
+        conflict_file.write_text(conflict_original)
+        with pytest.raises(ValueError, match="Conflicting model_config"):
+            _run_main(
+                [f_string_file, conflict_file],
+                [
+                    {"type": "remove-f-prefix"},
+                    {"type": "pydantic-config-to-model-config"},
+                ],
+                convert_to_agito=False,
+            )
+        assert f_string_file.read_text() == f_string_original
+        assert conflict_file.read_text() == conflict_original
+        captured = capsys.readouterr()
+        assert "Reverting changes" in captured.out
+        assert "Changes reverted" in captured.out
 
 
 def test_main_callable():
@@ -125,7 +122,7 @@ def test_modifier_with_excluded_path():
             content="x = f'hello'",
             module=parse_module("x = f'hello'"),
         )
-        assert modifier._modify_file(file_data) is False
+        assert modifier.modify([file_data]) is False
 
 
 def test_modifier_with_both_include_exclude_paths_fails():
@@ -150,12 +147,3 @@ def test_modifier_with_included_paths():
         test_file2 = Path(tmpdir) / "test2.py"
         test_file2.write_text("x = f'hello'")
         assert modifier.should_process_file(test_file2) is False
-
-
-def test_import_adder_with_no_changes():
-
-    code = "x = 5"
-    module = parse_module(code)
-    adder = ModuleImportAdder()
-    result = adder.add(module, "typing", [], [])
-    assert result.code == code

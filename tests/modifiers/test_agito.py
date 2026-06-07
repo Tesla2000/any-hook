@@ -1,30 +1,23 @@
-import re
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import MagicMock, patch
 
+import pytest
 from libcst import parse_module
 
-from any_hook._file_data import FileData
-from any_hook.files_modifiers._import_adder import ModuleImportAdder
-from any_hook.files_modifiers.agito import Agito, _AgitoTransformer
+from any_hook import FileData
+from any_hook.files_modifiers.agito import Agito
 from any_hook.files_modifiers.check_untracked import CheckUntracked
-from any_hook.files_modifiers.len_as_bool import (
-    LenAsBool,
-    _LenAsBoolTransformer,
-)
+from any_hook.files_modifiers.len_as_bool import LenAsBool
 from any_hook.files_modifiers.local_imports import LocalImports
 from any_hook.files_modifiers.local_imports_to_top import LocalImportsToTop
 from any_hook.files_modifiers.return_tuple_parens_drop import (
-    _ReturnTupleParensDropTransformer,
+    ReturnTupleParensDrop,
 )
-from any_hook.files_modifiers.typing_to_builtin import (
-    _TypingToBuiltinTransformer,
-)
+from any_hook.files_modifiers.typing_to_builtin import TypingToBuiltin
 from any_hook.files_modifiers.workflow_env_to_example import (
     WorkflowEnvToExample,
 )
-from tests.modifiers._base import TransformerTestCase
 
 _CHECK_UNTRACKED_MODULE = f"{CheckUntracked.__module__}.subprocess.run"
 _CHECK_UNTRACKED_GIT_ROOT = (
@@ -44,54 +37,51 @@ def _make_file_data(name: str = "a.py") -> FileData:
     )
 
 
-_IGNORE = re.compile(r"#\s*ignore", re.IGNORECASE)
+class TestAgitoTransformer:
+    @pytest.fixture
+    def run_agito(self, tmp_path):
+        def run(code: str) -> str:
+            test_file = tmp_path / "test.py"
+            test_file.write_text(code)
+            agito = Agito(
+                modifiers=(
+                    LenAsBool(),
+                    ReturnTupleParensDrop(),
+                    TypingToBuiltin(),
+                )
+            )
+            file_data = FileData(
+                path=test_file,
+                content=code,
+                module=parse_module(code),
+            )
+            agito.modify([file_data])
+            return test_file.read_text()
 
+        return run
 
-def _make_transformers() -> list:
-    return [
-        _LenAsBoolTransformer(_IGNORE),
-        _ReturnTupleParensDropTransformer(_IGNORE),
-        _TypingToBuiltinTransformer(_IGNORE, ModuleImportAdder()),
-    ]
-
-
-class TestAgitoTransformer(TransformerTestCase):
-    def test_applies_all_transformers_in_one_pass(self):
+    def test_applies_all_transformers_in_one_pass(self, run_agito):
         code = "from typing import List\ndef foo(x: List[int]):\n    if len(x):\n        return (x, 1)\n"
         expected = "def foo(x: list[int]):\n    if x:\n        return x, 1\n"
-        self._assert_transformation(code, expected)
+        assert run_agito(code) == expected
 
-    def test_result_matches_sequential_application(self):
-        code = "from typing import Dict\ndef f(x: Dict[str, int]):\n    if len(x):\n        return (x, 2)\n"
-        module = parse_module(code)
-        sequential = (
-            module.visit(_LenAsBoolTransformer(_IGNORE))
-            .visit(_ReturnTupleParensDropTransformer(_IGNORE))
-            .visit(_TypingToBuiltinTransformer(_IGNORE, ModuleImportAdder()))
-        )
-        merged = module.visit(_AgitoTransformer(_make_transformers()))
-        assert sequential.code == merged.code
-
-    def test_each_transformer_still_applies_independently(self):
+    def test_each_transformer_still_applies_independently(self, run_agito):
         code = "if len(items):\n    pass\n"
         expected = "if items:\n    pass\n"
-        self._assert_transformation(code, expected)
+        assert run_agito(code) == expected
 
-    def test_return_tuple_parens_drop_applied(self):
-        code = "return (a, b)\n"
-        expected = "return a, b\n"
-        self._assert_transformation(code, expected)
+    def test_return_tuple_parens_drop_applied(self, run_agito):
+        code = "def f():\n    return (a, b)\n"
+        expected = "def f():\n    return a, b\n"
+        assert run_agito(code) == expected
 
-    def test_unrelated_code_is_untouched(self):
+    def test_unrelated_code_is_untouched(self, run_agito):
         code = "x = 1 + 2\n"
-        self._assert_no_transformation(code)
+        assert run_agito(code) == code
 
-    def test_no_change_when_nothing_matches(self):
+    def test_no_change_when_nothing_matches(self, run_agito):
         code = "x = 1\n"
-        self._assert_no_transformation(code)
-
-    def _create_transformer(self) -> _AgitoTransformer:
-        return _AgitoTransformer(_make_transformers())
+        assert run_agito(code) == code
 
 
 class TestAgitoGlobalModifiers:

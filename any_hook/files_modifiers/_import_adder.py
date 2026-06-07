@@ -2,7 +2,7 @@ from collections.abc import Sequence
 
 from libcst import (
     BaseCompoundStatement,
-    ImportAlias,
+    FromImportAlias,
     ImportFrom,
     ImportStar,
     MaybeSentinel,
@@ -56,7 +56,7 @@ class ModuleImportAdder(BaseModel):
                         )
                     ]
                     new_entries = [
-                        ImportAlias(name=Name(n))
+                        FromImportAlias(name=Name(n))
                         for n in add_names
                         if n not in existing_names
                     ]
@@ -79,7 +79,9 @@ class ModuleImportAdder(BaseModel):
                 body=[
                     ImportFrom(
                         module=Name(module_name),
-                        names=[ImportAlias(name=Name(n)) for n in add_names],
+                        names=[
+                            FromImportAlias(name=Name(n)) for n in add_names
+                        ],
                     )
                 ],
             )

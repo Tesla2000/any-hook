@@ -3,13 +3,11 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from textwrap import dedent
 
-from libcst import parse_module
+from libcst import CSTTransformer, parse_module
 
-from any_hook._file_data import FileData
-from any_hook.files_modifiers._import_adder import ModuleImportAdder
+from any_hook import FileData
 from any_hook.files_modifiers.utcnow_to_datetime_now import (
     UtcNowToDatetimeNow,
-    _UtcNowTransformer,
 )
 from tests.modifiers._base import TransformerTestCase
 
@@ -203,8 +201,8 @@ class TestUtcNowToDatetimeNow(TransformerTestCase):
         self._assert_transformation(code, expected)
         module = parse_module(code)
         result = module.visit(
-            _UtcNowTransformer(
-                re.compile(r"#\s*ignore", re.IGNORECASE), ModuleImportAdder()
+            UtcNowToDatetimeNow().create_transformer(
+                re.compile(r"#\s*ignore", re.IGNORECASE)
             )
         )
         assert "from datetime import" not in result.code
@@ -248,7 +246,7 @@ class TestUtcNowToDatetimeNow(TransformerTestCase):
             content="x = 5",
             module=parse_module("x = 5"),
         )
-        assert modifier._modify_file(file_data) is False
+        assert modifier.modify([file_data]) is False
 
     def test_utcnow_in_list_comprehension(self):
         code = dedent("""
@@ -393,7 +391,7 @@ class TestUtcNowToDatetimeNow(TransformerTestCase):
                 content=code,
                 module=parse_module(code),
             )
-            assert modifier._modify_file(file_data) is True
+            assert modifier.modify([file_data]) is True
 
     def test_utcnow_as_argument_nested_call(self):
         code = dedent("""
@@ -413,7 +411,7 @@ class TestUtcNowToDatetimeNow(TransformerTestCase):
         """).lstrip()
         self._assert_no_transformation(code)
 
-    def _create_transformer(self) -> _UtcNowTransformer:
-        return _UtcNowTransformer(
-            re.compile(r"#\s*ignore", re.IGNORECASE), ModuleImportAdder()
+    def _create_transformer(self) -> CSTTransformer:
+        return UtcNowToDatetimeNow().create_transformer(
+            re.compile(r"#\s*ignore", re.IGNORECASE)
         )
