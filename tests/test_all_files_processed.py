@@ -1,9 +1,8 @@
 from pathlib import Path
-from unittest.mock import patch
 
 from libcst import parse_module
 
-from any_hook._file_data import FileData
+from any_hook import FileData
 from any_hook.files_modifiers.forbidden_functions import ForbiddenFunctions
 
 
@@ -20,9 +19,13 @@ class TestAllFilesProcessed:
             _make_file("b.py", violation_code),
             _make_file("c.py", clean_code),
         ]
+        consumed: list[str] = []
+
+        def _track():
+            for file_data in files:
+                consumed.append(str(file_data.path))
+                yield file_data
+
         modifier = ForbiddenFunctions(forbidden_functions=(hasattr.__name__,))
-        with patch.object(
-            modifier, "_check_file", wraps=modifier._check_file
-        ) as spy:
-            modifier.modify(files)
-        assert spy.call_count == len(files)
+        modifier.modify(_track())
+        assert consumed == [str(f.path) for f in files]

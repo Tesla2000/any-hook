@@ -5,7 +5,7 @@ from typing import Literal, NamedTuple
 
 import libcst as cst
 from autoimport import fix_code
-from libcst import CSTTransformer, CSTVisitor
+from libcst import CSTTransformer, CSTVisitor, ImportAttribute
 from pydantic import BaseModel, Field, RootModel
 from pydantic_settings import BaseSettings
 
@@ -43,13 +43,9 @@ class _StubCollector(CSTVisitor):
     def visit_ImportFrom(self, node: cst.ImportFrom) -> bool:
         if isinstance(node.names, cst.ImportStar):
             return False
-        dots = len(node.relative)
-        module_str = _module_to_str(node.module)
-        is_pydantic = _is_pydantic_module(node.module) if dots == 0 else False
-        resolved = _resolve_import_py(self._file, module_str, dots)
+        is_pydantic = self._is_pydantic_module(node)
+        resolved = self._resolve_import_py(node)
         for alias in node.names:
-            if not isinstance(alias.name, cst.Name):
-                continue
             original = alias.name.value
             local = (
                 alias.asname.name.value
@@ -67,7 +63,9 @@ class _StubCollector(CSTVisitor):
         name = node.name.value
         self._class_stack.append(name)
         self.class_bases[name] = [
-            _get_name(arg.value) for arg in node.bases if _get_name(arg.value)
+            self._get_name(arg.value)
+            for arg in node.bases
+            if self._get_name(arg.value)
         ]
         self.own_fields[name] = []
         return True
@@ -81,9 +79,9 @@ class _StubCollector(CSTVisitor):
         if not isinstance(node.target, cst.Name):
             return False
         name = node.target.value
-        if name.startswith("_") or _is_classvar(node.annotation):
+        if name.startswith("_") or self._is_classvar(node.annotation):
             return False
-        annotation, has_default = _unwrap_annotated(
+        annotation, has_default = _PydanticStubTransformer._unwrap_annotated(
             node.annotation.annotation, node.value
         )
         self.own_fields[self._class_stack[-1]].append(
@@ -92,6 +90,72 @@ class _StubCollector(CSTVisitor):
             )
         )
         return False
+
+    @staticmethod
+    def _get_name(node: cst.BaseExpression) -> str:
+        if isinstance(node, cst.Name):
+            return node.value
+        if isinstance(node, cst.Attribute):
+            return node.attr.value
+        return ""
+
+    @classmethod
+    def _non_empty_module_to_str(
+        cls, module: ImportAttribute | cst.Name
+    ) -> str:
+        if isinstance(module, cst.Name):
+            return module.value
+        return (
+            f"{cls._non_empty_module_to_str(module.value)}.{module.attr.value}"
+        )
+
+    def _resolve_import_py(self, node: cst.ImportFrom) -> Path | None:
+        dots = len(node.relative)
+        module = node.module
+        if module is None:
+            base = self._file.parent
+            for _ in range(dots - 1):
+                base = base.parent
+            candidate = base / "__init__.py"
+        elif dots == 0:
+            module_str = self._non_empty_module_to_str(module)
+            candidate = Path(*module_str.split(".")).with_suffix(".py")
+            if not candidate.exists():
+                candidate = self._file.parent.joinpath(
+                    *module_str.split(".")
+                ).with_suffix(".py")
+        else:
+            base = self._file.parent
+            for _ in range(dots - 1):
+                base = base.parent
+            module_str = self._non_empty_module_to_str(module)
+            candidate = base.joinpath(*module_str.split(".")).with_suffix(
+                ".py"
+            )
+        return candidate if candidate.exists() else None
+
+    @classmethod
+    def _is_pydantic_module(cls, node: cst.ImportFrom) -> bool:
+        if node.module is None:
+            return False
+        if node.relative:
+            return False
+        return cls._is_pydantic_module_expr(node.module)
+
+    @classmethod
+    def _is_pydantic_module_expr(
+        cls, module: ImportAttribute | cst.Name
+    ) -> bool:
+        if isinstance(module, cst.Name):
+            return module.value == "pydantic"
+        return cls._is_pydantic_module_expr(module.value)
+
+    @staticmethod
+    def _is_classvar(annotation: cst.Annotation) -> bool:
+        ann = annotation.annotation
+        if isinstance(ann, cst.Subscript) and isinstance(ann.value, cst.Name):
+            return ann.value.value == "ClassVar"
+        return isinstance(ann, cst.Name) and ann.value == "ClassVar"
 
 
 def _file_key(file: Path, output_dir: Path) -> Path:
@@ -186,30 +250,6 @@ def _build_registry(
     return registry
 
 
-def _resolve_import_py(
-    current_file: Path, module_str: str, dots: int
-) -> Path | None:
-    if dots == 0:
-        if not module_str:
-            return None
-        candidate = Path(*module_str.split(".")).with_suffix(".py")
-        if not candidate.exists():
-            candidate = current_file.parent.joinpath(
-                *module_str.split(".")
-            ).with_suffix(".py")
-    else:
-        base = current_file.parent
-        for _ in range(dots - 1):
-            base = base.parent
-        if module_str:
-            candidate = base.joinpath(*module_str.split(".")).with_suffix(
-                ".py"
-            )
-        else:
-            candidate = base / "__init__.py"
-    return candidate if candidate.exists() else None
-
-
 class _PydanticStubTransformer(CSTTransformer):
     def __init__(
         self, stub_file: Path, registry: dict[_ClassKey, list[_FieldEntry]]
@@ -236,129 +276,102 @@ class _PydanticStubTransformer(CSTTransformer):
             return updated_node
         if not isinstance(updated_node.body, cst.IndentedBlock):
             return updated_node
-        return _inject_pydantic_init(updated_node, self._registry[key])
+        return self._inject_pydantic_init(updated_node, self._registry[key])
 
-
-def _inject_pydantic_init(
-    node: cst.ClassDef,
-    fields: list[_FieldEntry],
-) -> cst.ClassDef:
-    new_body = [
-        statement
-        for statement in node.body.body
-        if not (
-            isinstance(statement, cst.FunctionDef)
-            and statement.name.value == "__init__"
-        )
-    ]
-    new_body.append(_build_init(fields))
-    return node.with_changes(body=node.body.with_changes(body=new_body))
-
-
-def _build_init(fields: list[_FieldEntry]) -> cst.FunctionDef:
-    self_param = cst.Param(name=cst.Name("self"))
-    if not fields:
-        params = cst.Parameters(params=[self_param])
-    else:
-        kwonly_params = [
-            cst.Param(
-                name=cst.Name(name),
-                annotation=cst.Annotation(annotation=annotation),
-                default=cst.Ellipsis() if has_default else None,
+    @staticmethod
+    def _inject_pydantic_init(
+        node: cst.ClassDef,
+        fields: list[_FieldEntry],
+    ) -> cst.ClassDef:
+        new_body = [
+            statement
+            for statement in node.body.body
+            if not (
+                isinstance(statement, cst.FunctionDef)
+                and statement.name.value == "__init__"
             )
-            for name, annotation, has_default in fields
         ]
-        params = cst.Parameters(
-            params=[self_param],
-            star_arg=cst.ParamStar(),
-            kwonly_params=kwonly_params,
-        )
-    return cst.FunctionDef(
-        name=cst.Name("__init__"),
-        params=params,
-        returns=cst.Annotation(annotation=cst.Name("None")),
-        body=cst.SimpleStatementSuite(body=[cst.Expr(value=cst.Ellipsis())]),
-        leading_lines=(),
-    )
+        new_body.append(_PydanticStubTransformer._build_init(fields))
+        return node.with_changes(body=node.body.with_changes(body=new_body))
 
-
-def _unwrap_annotated(
-    annotation: cst.BaseExpression, value: cst.BaseExpression | None
-) -> tuple[cst.BaseExpression, bool]:
-    if (
-        isinstance(annotation, cst.Subscript)
-        and isinstance(annotation.value, cst.Name)
-        and annotation.value.value == "Annotated"
-        and isinstance(annotation.slice, (list, tuple))
-        and len(annotation.slice) >= 2
-    ):
-        inner = annotation.slice[0]
-        field_arg = annotation.slice[1]
-        if isinstance(inner, cst.SubscriptElement) and isinstance(
-            inner.slice, cst.Index
-        ):
-            inner_type = inner.slice.value
+    @staticmethod
+    def _build_init(fields: list[_FieldEntry]) -> cst.FunctionDef:
+        self_param = cst.Param(name=cst.Name("self"))
+        if not fields:
+            params = cst.Parameters(params=[self_param])
         else:
-            inner_type = annotation
-        if isinstance(field_arg, cst.SubscriptElement) and isinstance(
-            field_arg.slice, cst.Index
+            kwonly_params = [
+                cst.Param(
+                    name=cst.Name(name),
+                    annotation=cst.Annotation(annotation=annotation),
+                    default=cst.Ellipsis() if has_default else None,
+                )
+                for name, annotation, has_default in fields
+            ]
+            params = cst.Parameters(
+                params=[self_param],
+                star_arg=cst.ParamStar(),
+                kwonly_params=kwonly_params,
+            )
+        return cst.FunctionDef(
+            name=cst.Name("__init__"),
+            params=params,
+            returns=cst.Annotation(annotation=cst.Name("None")),
+            body=cst.SimpleStatementSuite(
+                body=[cst.Expr(value=cst.Ellipsis())]
+            ),
+            leading_lines=(),
+        )
+
+    @staticmethod
+    def _unwrap_annotated(
+        annotation: cst.BaseExpression, value: cst.BaseExpression | None
+    ) -> tuple[cst.BaseExpression, bool]:
+        if (
+            isinstance(annotation, cst.Subscript)
+            and isinstance(annotation.value, cst.Name)
+            and annotation.value.value == "Annotated"
+            and isinstance(annotation.slice, (list, tuple))
+            and len(annotation.slice) >= 2
         ):
-            field_expr = field_arg.slice.value
-            if (
-                isinstance(field_expr, cst.Call)
-                and isinstance(field_expr.func, cst.Name)
-                and field_expr.func.value == "Field"
+            inner = annotation.slice[0]
+            field_arg = annotation.slice[1]
+            if isinstance(inner, cst.SubscriptElement) and isinstance(
+                inner.slice, cst.Index
             ):
-                return inner_type, _has_default(field_expr)
-        return inner_type, _has_default(value)
-    return annotation, _has_default(value)
+                inner_type = inner.slice.value
+            else:
+                inner_type = annotation
+            if isinstance(field_arg, cst.SubscriptElement) and isinstance(
+                field_arg.slice, cst.Index
+            ):
+                field_expr = field_arg.slice.value
+                if (
+                    isinstance(field_expr, cst.Call)
+                    and isinstance(field_expr.func, cst.Name)
+                    and field_expr.func.value == "Field"
+                ):
+                    return inner_type, _PydanticStubTransformer._has_default(
+                        field_expr
+                    )
+            return inner_type, _PydanticStubTransformer._has_default(value)
+        return annotation, _PydanticStubTransformer._has_default(value)
 
-
-def _has_default(value: cst.BaseExpression | None) -> bool:
-    if value is None:
-        return False
-    if not isinstance(value, cst.Call):
-        return True
-    if not (isinstance(value.func, cst.Name) and value.func.value == "Field"):
-        return True
-    return any(
-        arg.keyword is None
-        or arg.keyword.value in ("default", "default_factory")
-        for arg in value.args
-    )
-
-
-def _is_classvar(annotation: cst.Annotation) -> bool:
-    ann = annotation.annotation
-    if isinstance(ann, cst.Subscript) and isinstance(ann.value, cst.Name):
-        return ann.value.value == "ClassVar"
-    return isinstance(ann, cst.Name) and ann.value == "ClassVar"
-
-
-def _get_name(node: cst.BaseExpression) -> str:
-    if isinstance(node, cst.Name):
-        return node.value
-    if isinstance(node, cst.Attribute):
-        return node.attr.value
-    return ""
-
-
-def _module_to_str(module: cst.BaseExpression | None) -> str:
-    if module is None:
-        return ""
-    if isinstance(module, cst.Name):
-        return module.value
-    if isinstance(module, cst.Attribute):
-        return f"{_module_to_str(module.value)}.{module.attr.value}"
-    return ""
-
-
-def _is_pydantic_module(module: object) -> bool:
-    if isinstance(module, cst.Name):
-        return module.value == "pydantic"
-    if isinstance(module, cst.Attribute):
-        return _is_pydantic_module(module.value)
-    return False
+    @staticmethod
+    def _has_default(value: cst.BaseExpression | None) -> bool:
+        if value is None:
+            return False
+        if not isinstance(value, cst.Call):
+            return True
+        if not (
+            isinstance(value.func, cst.Name) and value.func.value == "Field"
+        ):
+            return True
+        return any(
+            arg.keyword is None
+            or arg.keyword.value in ("default", "default_factory")
+            for arg in value.args
+        )
 
 
 class GenerateStubs(Modifier):

@@ -2,13 +2,10 @@ import re
 import tempfile
 from pathlib import Path
 
-from libcst import parse_module
+from libcst import CSTTransformer, parse_module
 
-from any_hook._file_data import FileData
-from any_hook.files_modifiers.remove_f_prefix import (
-    RemoveFPrefix,
-    _RemoveFPrefixTransformer,
-)
+from any_hook import FileData
+from any_hook.files_modifiers.remove_f_prefix import RemoveFPrefix
 from tests.modifiers._base import TransformerTestCase
 
 
@@ -85,7 +82,7 @@ class TestRemoveFPrefix(TransformerTestCase):
             content='x = "hello"',
             module=parse_module('x = "hello"'),
         )
-        assert modifier._modify_file(file_data) is False
+        assert modifier.modify([file_data]) is False
 
     def test_modify_file_with_single_quotes(self):
 
@@ -98,14 +95,14 @@ class TestRemoveFPrefix(TransformerTestCase):
                 content="x = f'hello'",
                 module=parse_module("x = f'hello'"),
             )
-            assert modifier._modify_file(file_data) is True
+            assert modifier.modify([file_data]) is True
             assert test_file.read_text() == "x = 'hello'"
 
     def test_f_string_ignored(self):
         code = 'x = f"hello"  # ignore'
         self._assert_no_transformation(code)
 
-    def _create_transformer(self) -> _RemoveFPrefixTransformer:
-        return _RemoveFPrefixTransformer(
+    def _create_transformer(self) -> CSTTransformer:
+        return RemoveFPrefix().create_transformer(
             re.compile(r"#\s*ignore", re.IGNORECASE)
         )

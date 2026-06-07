@@ -1,13 +1,10 @@
 from pathlib import Path
 from textwrap import dedent
 
-from libcst import SimpleString, parse_module
+from libcst import parse_module
 
-from any_hook._file_data import FileData
-from any_hook.files_modifiers.field_validator_check import (
-    FieldValidatorCheck,
-    _FieldValidatorVisitor,
-)
+from any_hook import FileData
+from any_hook.files_modifiers.field_validator_check import FieldValidatorCheck
 from tests.modifiers._base import TransformerTestCase
 
 
@@ -118,7 +115,7 @@ class TestFieldValidatorCheck(TransformerTestCase):
         """).lstrip()
         assert not self._check(code)
 
-    def test_is_field_validator_call_with_non_call_decorator(self):
+    def test_bare_field_validator_decorator_not_checked(self):
         code = dedent("""
             class Model:
                 @field_validator
@@ -126,51 +123,39 @@ class TestFieldValidatorCheck(TransformerTestCase):
                 def validate_name(cls, v):
                     return v.strip()
         """).lstrip()
-        module = parse_module(code)
-        func_def = module.body[0].body.body[0]
-        decorator = func_def.decorators[0]
-        result = _FieldValidatorVisitor._is_field_validator_call(decorator)
-        assert result is False
+        assert not self._check(code)
 
-    def test_is_field_validator_call_with_call_but_non_name_func(self):
+    def test_called_callable_decorator_not_checked(self):
         code = dedent("""
+            from pydantic import field_validator
             class Model:
                 @get_validator()("name")
                 @classmethod
                 def validate_name(cls, v):
                     return v.strip()
         """).lstrip()
-        module = parse_module(code)
-        func_def = module.body[0].body.body[0]
-        decorator = func_def.decorators[0]
-        result = _FieldValidatorVisitor._is_field_validator_call(decorator)
-        assert result is False
+        assert not self._check(code)
 
-    def test_is_field_validator_call_with_call_but_different_name(self):
+    def test_non_field_validator_call_decorator_not_checked(self):
         code = dedent("""
+            from pydantic import field_validator
             class Model:
                 @other_validator("name")
                 @classmethod
                 def validate_name(cls, v):
                     return v.strip()
         """).lstrip()
-        module = parse_module(code)
-        func_def = module.body[0].body.body[0]
-        decorator = func_def.decorators[0]
-        result = _FieldValidatorVisitor._is_field_validator_call(decorator)
-        assert result is False
+        assert not self._check(code)
 
-    def test_extract_string_value_with_non_string(self):
-        code = "x = 1"
-        module = parse_module(code)
-        value = module.body[0].body[0].value
-        result = _FieldValidatorVisitor._extract_string_value(value)
-        assert result is None
-
-    def test_extract_string_value_with_string(self):
-        decorator_str = SimpleString('"name"')
-        result = _FieldValidatorVisitor._extract_string_value(decorator_str)
-        assert result == "name"
+    def test_non_string_field_arg_ignored(self):
+        code = dedent("""
+            field_name = "name"
+            @field_validator(field_name)
+            @classmethod
+            def validate_name(cls, v):
+                return v.strip()
+        """).lstrip()
+        assert self._check(code)
 
     def test_decorator_without_decorator_call_skipped(self):
         code = dedent("""
@@ -187,20 +172,6 @@ class TestFieldValidatorCheck(TransformerTestCase):
                 pass
         """).lstrip()
         assert not self._check(code)
-
-    def test_extract_field_names_with_keyword_args(self):
-        code = dedent("""
-            class Model:
-                @field_validator("name", mode="after")
-                @classmethod
-                def validate_name(cls, v):
-                    return cls._clean(v)
-        """).lstrip()
-        module = parse_module(code)
-        func_def = module.body[0].body.body[0]
-        decorator = func_def.decorators[0]
-        field_names = _FieldValidatorVisitor._extract_field_names(decorator)
-        assert field_names == ["name"]
 
     def test_function_with_no_decorators(self):
         code = dedent("""
@@ -259,20 +230,6 @@ class TestFieldValidatorCheck(TransformerTestCase):
             path=Path("test.py"), content=code, module=parse_module(code)
         )
         assert not modifier.modify([file_data])
-
-    def test_extract_field_names_with_non_call_decorator(self):
-        code = dedent("""
-            class Model:
-                @field_validator
-                @classmethod
-                def validate_name(cls, v):
-                    return v.strip()
-        """).lstrip()
-        module = parse_module(code)
-        func_def = module.body[0].body.body[0]
-        decorator = func_def.decorators[0]
-        field_names = _FieldValidatorVisitor._extract_field_names(decorator)
-        assert field_names == []
 
     def _check(self, code: str) -> bool:
         file_data = FileData(

@@ -3,13 +3,10 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from textwrap import dedent
 
-from libcst import parse_module
+from libcst import CSTTransformer, parse_module
 
-from any_hook._file_data import FileData
-from any_hook.files_modifiers.str_enum_inheritance import (
-    StrEnumInheritance,
-    _StrEnumInheritanceTransformer,
-)
+from any_hook import FileData
+from any_hook.files_modifiers.str_enum_inheritance import StrEnumInheritance
 from tests.modifiers._base import TransformerTestCase
 
 
@@ -804,9 +801,9 @@ class TestStrEnumInheritance(TransformerTestCase):
                 ACTIVE = "active"
         """).lstrip()
 
-        transformer = _StrEnumInheritanceTransformer(
-            re.compile(r"#\s*ignore", re.IGNORECASE), convert_to_auto=False
-        )
+        transformer = StrEnumInheritance(
+            convert_to_auto=False
+        ).create_transformer(re.compile(r"#\s*ignore", re.IGNORECASE))
         module = parse_module(code)
         result = module.visit(transformer)
         assert result.code == expected
@@ -859,9 +856,9 @@ class TestStrEnumInheritance(TransformerTestCase):
                 PENDING = auto()
         """).lstrip()
 
-        transformer = _StrEnumInheritanceTransformer(
-            re.compile(r"#\s*ignore", re.IGNORECASE), convert_to_auto=True
-        )
+        transformer = StrEnumInheritance(
+            convert_to_auto=True
+        ).create_transformer(re.compile(r"#\s*ignore", re.IGNORECASE))
         module = parse_module(code)
         result = module.visit(transformer)
         assert result.code == expected
@@ -880,9 +877,9 @@ class TestStrEnumInheritance(TransformerTestCase):
                 PENDING: str = auto()
         """).lstrip()
 
-        transformer = _StrEnumInheritanceTransformer(
-            re.compile(r"#\s*ignore", re.IGNORECASE), convert_to_auto=True
-        )
+        transformer = StrEnumInheritance(
+            convert_to_auto=True
+        ).create_transformer(re.compile(r"#\s*ignore", re.IGNORECASE))
         module = parse_module(code)
         result = module.visit(transformer)
         assert result.code == expected
@@ -899,9 +896,9 @@ class TestStrEnumInheritance(TransformerTestCase):
                 ACTIVE = "different"
         """).lstrip()
 
-        transformer = _StrEnumInheritanceTransformer(
-            re.compile(r"#\s*ignore", re.IGNORECASE), convert_to_auto=True
-        )
+        transformer = StrEnumInheritance(
+            convert_to_auto=True
+        ).create_transformer(re.compile(r"#\s*ignore", re.IGNORECASE))
         module = parse_module(code)
         result = module.visit(transformer)
         assert result.code == expected
@@ -918,9 +915,9 @@ class TestStrEnumInheritance(TransformerTestCase):
                 ACTIVE: str = "different"
         """).lstrip()
 
-        transformer = _StrEnumInheritanceTransformer(
-            re.compile(r"#\s*ignore", re.IGNORECASE), convert_to_auto=True
-        )
+        transformer = StrEnumInheritance(
+            convert_to_auto=True
+        ).create_transformer(re.compile(r"#\s*ignore", re.IGNORECASE))
         module = parse_module(code)
         result = module.visit(transformer)
         assert result.code == expected
@@ -937,9 +934,9 @@ class TestStrEnumInheritance(TransformerTestCase):
                 ACTIVE = PENDING = "active"
         """).lstrip()
 
-        transformer = _StrEnumInheritanceTransformer(
-            re.compile(r"#\s*ignore", re.IGNORECASE), convert_to_auto=True
-        )
+        transformer = StrEnumInheritance(
+            convert_to_auto=True
+        ).create_transformer(re.compile(r"#\s*ignore", re.IGNORECASE))
         module = parse_module(code)
         result = module.visit(transformer)
         assert result.code == expected
@@ -956,9 +953,9 @@ class TestStrEnumInheritance(TransformerTestCase):
                 obj.x = "active"
         """).lstrip()
 
-        transformer = _StrEnumInheritanceTransformer(
-            re.compile(r"#\s*ignore", re.IGNORECASE), convert_to_auto=True
-        )
+        transformer = StrEnumInheritance(
+            convert_to_auto=True
+        ).create_transformer(re.compile(r"#\s*ignore", re.IGNORECASE))
         module = parse_module(code)
         result = module.visit(transformer)
         assert result.code == expected
@@ -975,15 +972,33 @@ class TestStrEnumInheritance(TransformerTestCase):
                 obj.x: str = "active"
         """).lstrip()
 
-        transformer = _StrEnumInheritanceTransformer(
-            re.compile(r"#\s*ignore", re.IGNORECASE), convert_to_auto=True
-        )
+        transformer = StrEnumInheritance(
+            convert_to_auto=True
+        ).create_transformer(re.compile(r"#\s*ignore", re.IGNORECASE))
         module = parse_module(code)
         result = module.visit(transformer)
         assert result.code == expected
 
-    def _create_transformer(self):
+    def test_imports_unchanged_when_str_enum_already_imported_and_enum_still_used(
+        self,
+    ):
+        code = dedent("""
+            from enum import Enum, StrEnum
+            class Color(str, Enum):
+                RED = "red"
+            class Other(Enum):
+                ONE = 1
+        """).lstrip()
+        expected = dedent("""
+            from enum import Enum, StrEnum
+            class Color(StrEnum):
+                RED = "red"
+            class Other(Enum):
+                ONE = 1
+        """).lstrip()
+        self._assert_transformation(code, expected)
 
-        return _StrEnumInheritanceTransformer(
-            re.compile(r"#\s*ignore", re.IGNORECASE)
-        )
+    def _create_transformer(self) -> CSTTransformer:
+        return StrEnumInheritance(
+            convert_to_auto=False, convert_existing_str_enum=False
+        ).create_transformer(re.compile(r"#\s*ignore", re.IGNORECASE))

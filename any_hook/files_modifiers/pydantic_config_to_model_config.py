@@ -1,5 +1,5 @@
 import re
-from typing import Iterable, Literal
+from typing import Iterable, Literal, Sequence
 
 import pydantic
 from libcst import (
@@ -133,25 +133,26 @@ class _PydanticConfigToModelConfigTransformer(IgnoreAwareTransformer):
                 continue
             new_body.append(statement)
         result = updated_node
+        *init_bases, last_base = updated_node.bases
         if inline_args and has_model_config and not config_class_inserted:
             new_body = list(
                 self._merge_inline_args_into_model_config(
                     new_body, inline_args
                 )
             )
-            result = self._strip_keywords(updated_node)
+            result = self._strip_keywords(updated_node, init_bases, last_base)
             self._made_changes = True
         elif (
             inline_args and not has_model_config and not config_class_inserted
         ):
             self._made_changes = True
-            result = self._strip_keywords(updated_node)
+            result = self._strip_keywords(updated_node, init_bases, last_base)
             model_config_statement = SimpleStatementLine(
                 body=[self._create_model_config_assignment(inline_args)],
             )
             new_body.insert(0, model_config_statement)
         elif inline_args and not has_model_config and config_class_inserted:
-            result = self._strip_keywords(updated_node)
+            result = self._strip_keywords(updated_node, init_bases, last_base)
         elif (
             not inline_args and has_model_config and not config_class_inserted
         ):
@@ -195,17 +196,21 @@ class _PydanticConfigToModelConfigTransformer(IgnoreAwareTransformer):
         return args
 
     @staticmethod
-    def _strip_keywords(node: ClassDef) -> ClassDef:
-        bases = list(node.bases)
-        if bases:
-            bases[-1] = bases[-1].with_changes(comma=MaybeSentinel.DEFAULT)
-        return node.with_changes(keywords=(), bases=bases)
+    def _strip_keywords(
+        node: ClassDef, init_bases: Sequence[Arg], last_base: Arg
+    ) -> ClassDef:
+        new_last = last_base.with_changes(comma=MaybeSentinel.DEFAULT)
+        return node.with_changes(keywords=(), bases=[*init_bases, new_last])
 
     @classmethod
     def _merge_inline_args_into_model_config(
         cls, body: Iterable[CSTNode], inline_args: list[Arg]
     ) -> Iterable[CSTNode]:
-        inline_keys = {arg.keyword.value for arg in inline_args if arg.keyword}
+        inline_keys = {
+            keyword.value
+            for arg in inline_args
+            if (keyword := arg.keyword) is not None
+        }
         for statement in body:
             if not (
                 isinstance(statement, SimpleStatementLine)
@@ -251,12 +256,9 @@ class _PydanticConfigToModelConfigTransformer(IgnoreAwareTransformer):
                         body_item.value
                     )
                     if config_call is None:
-                        if inline_keys:
-                            raise ValueError(
-                                f"Conflicting model_config keys defined in both inline class kwargs and model_config: {inline_keys}"
-                            )
-                        yield statement
-                        continue
+                        raise ValueError(
+                            f"Potential conflict between inline class kwargs ({inline_keys or '**kwargs'}) and model_config assignment"
+                        )
                     body_item = body_item.with_changes(value=config_call)
                     existing_keys = {
                         arg.keyword.value

@@ -2,10 +2,9 @@ import importlib.util
 import re
 import sys
 from pathlib import Path
-from typing import Literal, NamedTuple, Sequence, Union
+from typing import Literal, NamedTuple
 
 from libcst import (
-    BaseCompoundStatement,
     BaseString,
     ClassDef,
     Expr,
@@ -42,13 +41,30 @@ class _LocalImportsToTopTransformer(IgnoreAwareTransformer):
         self._include_src_imports = include_src_imports
         self._top_level_imports: set[str] = set()
         self._top_level_import_codes: set[str] = set()
+        self._insertion_point = 0
 
     def visit_Module(self, node: Module) -> bool:
-        for item in node.body:
-            if isinstance(item, SimpleStatementLine) and item.body:
-                stmt = item.body[0]
-                if isinstance(stmt, (Import, ImportFrom)):
-                    self._record_top_level_import(stmt, item)
+        insertion_point_locked = False
+        for i, item in enumerate(node.body):
+            if not isinstance(item, SimpleStatementLine) or not item.body:
+                if not insertion_point_locked:
+                    self._insertion_point = i
+                    insertion_point_locked = True
+                continue
+            first_stmt = item.body[0]
+            is_docstring = (
+                i == 0
+                and isinstance(first_stmt, Expr)
+                and isinstance(first_stmt.value, BaseString)
+            )
+            if isinstance(first_stmt, (Import, ImportFrom)):
+                self._record_top_level_import(first_stmt, item)
+                continue
+            if not insertion_point_locked and not is_docstring:
+                self._insertion_point = i
+                insertion_point_locked = True
+        if not insertion_point_locked:
+            self._insertion_point = len(node.body)
         return True
 
     def visit_FunctionDef(self, node: FunctionDef) -> bool:
@@ -95,33 +111,12 @@ class _LocalImportsToTopTransformer(IgnoreAwareTransformer):
         if not self._nested_imports:
             return updated_node
         deduplicated = self._deduplicate_imports(self._nested_imports)
-        insert_pos = self._find_import_insertion_point(updated_node.body)
+        insert_pos = self._insertion_point
         new_body = list(updated_node.body)
         for import_stmt in deduplicated:
             new_body.insert(insert_pos, import_stmt)
             insert_pos += 1
         return updated_node.with_changes(body=new_body)
-
-    @staticmethod
-    def _find_import_insertion_point(
-        body: Sequence[Union[SimpleStatementLine, BaseCompoundStatement]],
-    ) -> int:
-        for i, item in enumerate(body):
-            if (
-                isinstance(item, SimpleStatementLine)
-                and item.body
-                and isinstance(item.body[0], Expr)
-                and isinstance(item.body[0].value, BaseString)
-                and i == 0
-            ):
-                continue
-            if not (
-                isinstance(item, SimpleStatementLine)
-                and item.body
-                and isinstance(item.body[0], (Import, ImportFrom))
-            ):
-                return i
-        return len(body)
 
     def _record_top_level_import(
         self, stmt: Import | ImportFrom, line: SimpleStatementLine

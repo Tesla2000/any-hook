@@ -1,7 +1,14 @@
 import re
 from typing import Annotated, Literal
 
-from libcst import Attribute, Dot, Import, ImportFrom, Name
+from libcst import (
+    Attribute,
+    Dot,
+    Import,
+    ImportAttribute,
+    ImportFrom,
+    Name,
+)
 from pydantic import Field
 
 from any_hook._file_data import FileData
@@ -42,7 +49,7 @@ class _PydanticV1ToV2Transformer(IgnoreAwareTransformer):
             return updated_node
         new_names = []
         made_change = False
-        new_name: Name | Attribute
+        new_name: Name | ImportAttribute
         for original_alias, updated_alias in zip(
             original.names, updated_node.names
         ):
@@ -81,11 +88,9 @@ class _PydanticV1ToV2Transformer(IgnoreAwareTransformer):
             return updated_node.with_changes(value=inner.value)
         return updated_node
 
-    def _get_module_parts(self, node: Name | Attribute) -> list[str]:
+    def _get_module_parts(self, node: Name | ImportAttribute) -> list[str]:
         if isinstance(node, Name):
             return [node.value]
-        if not isinstance(node.value, (Name, Attribute)):
-            return []
         parts = self._get_module_parts(node.value)
         parts.append(node.attr.value)
         return parts
@@ -93,10 +98,12 @@ class _PydanticV1ToV2Transformer(IgnoreAwareTransformer):
     @staticmethod
     def _build_module_name(
         parts: Annotated[list[str], Field(min_length=2)],
-    ) -> Attribute:
-        base = Attribute(value=Name(parts[0]), attr=Name(parts[1]), dot=Dot())
+    ) -> ImportAttribute:
+        base = ImportAttribute(
+            value=Name(parts[0]), attr=Name(parts[1]), dot=Dot()
+        )
         for part in parts[2:]:
-            base = Attribute(value=base, attr=Name(part), dot=Dot())
+            base = ImportAttribute(value=base, attr=Name(part), dot=Dot())
         return base
 
 

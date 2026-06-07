@@ -5,12 +5,11 @@ from textwrap import dedent
 
 import libcst
 import pytest
+from libcst import CSTTransformer
 
-from any_hook._file_data import FileData
-from any_hook.files_modifiers._import_adder import ModuleImportAdder
+from any_hook import FileData
 from any_hook.files_modifiers.pydantic_config_to_model_config import (
     PydanticConfigToModelConfig,
-    _PydanticConfigToModelConfigTransformer,
 )
 from tests.modifiers._base import TransformerTestCase
 
@@ -736,11 +735,9 @@ class TestPydanticConfigToModelConfig(TransformerTestCase):
         """).lstrip()
         self._assert_transformation(code, expected)
 
-    def _create_transformer(self) -> _PydanticConfigToModelConfigTransformer:
-        return _PydanticConfigToModelConfigTransformer(
-            re.compile(r"#\s*ignore", re.IGNORECASE),
-            "Config",
-            ModuleImportAdder(),
+    def _create_transformer(self) -> CSTTransformer:
+        return PydanticConfigToModelConfig().create_transformer(
+            re.compile(r"#\s*ignore", re.IGNORECASE)
         )
 
     def test_merge_inline_with_compound_statement_in_body(self):
@@ -950,6 +947,64 @@ class TestPydanticConfigToModelConfig(TransformerTestCase):
         """).lstrip()
         self._assert_transformation(code, expected)
 
+    def test_kwargs_expansion_only_migrated_to_config_dict(self):
+        code = dedent("""
+            from pydantic import BaseModel
+            class User(BaseModel, **kwargs):
+                name: str
+        """).lstrip()
+        expected = dedent("""
+            from typing import ClassVar
+            from pydantic import BaseModel, ConfigDict
+            class User(BaseModel):
+                model_config: ClassVar[ConfigDict] = ConfigDict(**kwargs)
+                name: str
+        """).lstrip()
+        self._assert_transformation(code, expected)
+
+    def test_kwargs_expansion_merged_with_config_class(self):
+        code = dedent("""
+            from pydantic import BaseModel
+            class User(BaseModel, **kwargs):
+                name: str
+                class Config:
+                    frozen = True
+        """).lstrip()
+        expected = dedent("""
+            from typing import ClassVar
+            from pydantic import BaseModel, ConfigDict
+            class User(BaseModel):
+                name: str
+                model_config: ClassVar[ConfigDict] = ConfigDict(**kwargs, frozen=True)
+        """).lstrip()
+        self._assert_transformation(code, expected)
+
+    def test_kwargs_expansion_merged_with_existing_model_config_call(self):
+        code = dedent("""
+            from pydantic import BaseModel, ConfigDict
+            from typing import ClassVar
+            class User(BaseModel, **kwargs):
+                model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
+        """).lstrip()
+        expected = dedent("""
+            from pydantic import BaseModel, ConfigDict
+            from typing import ClassVar
+            class User(BaseModel):
+                model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid", **kwargs)
+        """).lstrip()
+        self._assert_transformation(code, expected)
+
+    def test_kwargs_expansion_with_non_call_model_config_raises(self):
+        code = dedent("""
+            from pydantic import BaseModel
+            class User(BaseModel, **kwargs):
+                model_config = some_dict
+        """).lstrip()
+        module = libcst.parse_module(code)
+        with pytest.raises(ValueError) as exc_info:
+            module.visit(self._create_transformer())
+        assert "kwargs" in str(exc_info.value).lower()
+
 
 class TestPydanticConfigModifyFile:
     def test_modify_file_early_return_with_no_config_and_no_inline(self):
@@ -1004,76 +1059,6 @@ class TestPydanticConfigModifyFile:
         modifier = PydanticConfigToModelConfig()
         result = modifier.modify([file_data])
         assert result
-
-
-class TestStripKeywordsEdgeCases:
-    def test_strip_keywords_with_no_bases(self):
-
-        class_def = libcst.ClassDef(
-            name=libcst.Name("User"),
-            bases=[],
-            body=libcst.SimpleStatementSuite(body=[libcst.Pass()]),
-            keywords=[
-                libcst.Arg(
-                    keyword=libcst.Name("frozen"), value=libcst.Name("True")
-                )
-            ],
-        )
-        result = _PydanticConfigToModelConfigTransformer._strip_keywords(
-            class_def
-        )
-        assert result.keywords == ()
-        assert result.bases == []
-
-    def test_merge_inline_with_non_call_assign_non_model_config(self):
-
-        body = [
-            libcst.SimpleStatementLine(
-                body=[
-                    libcst.Assign(
-                        targets=[
-                            libcst.AssignTarget(
-                                target=libcst.Name("other_var")
-                            )
-                        ],
-                        value=libcst.Name("value"),
-                    )
-                ]
-            )
-        ]
-        inline_args = []
-        result = list(
-            _PydanticConfigToModelConfigTransformer._merge_inline_args_into_model_config(
-                body, inline_args
-            )
-        )
-        assert result == body
-
-    def test_merge_inline_with_non_call_assign_model_config_no_inline_keys(
-        self,
-    ):
-
-        body = [
-            libcst.SimpleStatementLine(
-                body=[
-                    libcst.Assign(
-                        targets=[
-                            libcst.AssignTarget(
-                                target=libcst.Name("model_config")
-                            )
-                        ],
-                        value=libcst.Name("some_dict"),
-                    )
-                ]
-            )
-        ]
-        inline_args = []
-        result = list(
-            _PydanticConfigToModelConfigTransformer._merge_inline_args_into_model_config(
-                body, inline_args
-            )
-        )
-        assert result == body
 
 
 class TestPydanticConfigStripKeywords(TransformerTestCase):
@@ -1154,11 +1139,9 @@ class TestPydanticConfigStripKeywords(TransformerTestCase):
         """).lstrip()
         self._assert_no_transformation(code)
 
-    def _create_transformer(self) -> _PydanticConfigToModelConfigTransformer:
-        return _PydanticConfigToModelConfigTransformer(
-            re.compile(r"#\s*ignore", re.IGNORECASE),
-            "Config",
-            ModuleImportAdder(),
+    def _create_transformer(self) -> CSTTransformer:
+        return PydanticConfigToModelConfig().create_transformer(
+            re.compile(r"#\s*ignore", re.IGNORECASE)
         )
 
 
@@ -1181,11 +1164,9 @@ class TestPydanticConfigStatements(TransformerTestCase):
         """).lstrip()
         self._assert_transformation(code, expected)
 
-    def _create_transformer(self) -> _PydanticConfigToModelConfigTransformer:
-        return _PydanticConfigToModelConfigTransformer(
-            re.compile(r"#\s*ignore", re.IGNORECASE),
-            "Config",
-            ModuleImportAdder(),
+    def _create_transformer(self) -> CSTTransformer:
+        return PydanticConfigToModelConfig().create_transformer(
+            re.compile(r"#\s*ignore", re.IGNORECASE)
         )
 
 
@@ -1225,11 +1206,9 @@ class TestPydanticConfigImportHandling(TransformerTestCase):
         """).lstrip()
         self._assert_transformation(code, expected)
 
-    def _create_transformer(self) -> _PydanticConfigToModelConfigTransformer:
-        return _PydanticConfigToModelConfigTransformer(
-            re.compile(r"#\s*ignore", re.IGNORECASE),
-            "Config",
-            ModuleImportAdder(),
+    def _create_transformer(self) -> CSTTransformer:
+        return PydanticConfigToModelConfig().create_transformer(
+            re.compile(r"#\s*ignore", re.IGNORECASE)
         )
 
 

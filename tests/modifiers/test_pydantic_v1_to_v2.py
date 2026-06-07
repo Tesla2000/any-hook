@@ -3,14 +3,10 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from textwrap import dedent
 
-import libcst
-from libcst import parse_module
+from libcst import CSTTransformer, parse_module
 
-from any_hook._file_data import FileData
-from any_hook.files_modifiers.pydantic_v1_to_v2 import (
-    PydanticV1ToV2,
-    _PydanticV1ToV2Transformer,
-)
+from any_hook import FileData
+from any_hook.files_modifiers.pydantic_v1_to_v2 import PydanticV1ToV2
 from tests.modifiers._base import TransformerTestCase
 
 
@@ -192,7 +188,7 @@ class TestPydanticV1ToV2(TransformerTestCase):
                 "from pydantic import BaseModel\nclass Foo(BaseModel):\n    pass"
             ),
         )
-        assert modifier._modify_file(file_data) is False
+        assert modifier.modify([file_data]) is False
 
     def test_import_from_without_module(self):
         code = "from . import something"
@@ -345,23 +341,14 @@ class TestPydanticV1ToV2(TransformerTestCase):
         self._assert_no_transformation(code)
 
     def test_leave_importfrom_directly_processes_v1_imports(self):
-        """Test that leave_ImportFrom directly handles pydantic.v1 imports.
-
-        This test verifies that the leave_ImportFrom logic at lines 29-39
-        actually executes and sets _made_changes to True when processing
-        pydantic.v1 imports. The code should handle ImportFrom nodes with
-        pydantic.v1 module directly.
-        """
+        """Test that leave_ImportFrom directly handles pydantic.v1 imports."""
 
         code = "from pydantic.v1 import BaseModel"
         module = parse_module(code)
         transformer = self._create_transformer()
         result = module.visit(transformer)
 
-        # Verify the import was transformed
         assert "from pydantic import BaseModel" == result.code
-        # Verify that _made_changes was set (indicating the logic path was taken)
-        assert transformer._made_changes is True
 
     def test_leave_importfrom_nested_module_transformation(self):
         """Test that leave_ImportFrom handles nested pydantic.v1 modules.
@@ -378,7 +365,6 @@ class TestPydanticV1ToV2(TransformerTestCase):
 
         # Should transform to pydantic.fields.config
         assert "from pydantic.fields.config import Extra" == result.code
-        assert transformer._made_changes is True
 
     def test_leave_importfrom_len_equals_2_path(self):
         """Test that leave_ImportFrom len(module_parts)==2 branch is covered.
@@ -392,7 +378,6 @@ class TestPydanticV1ToV2(TransformerTestCase):
         result = module.visit(transformer)
 
         assert "from pydantic import BaseModel, Field" == result.code
-        assert transformer._made_changes is True
 
     def test_leave_import_directly_processes_v1_imports(self):
         """Test that leave_Import directly handles pydantic.v1 imports.
@@ -407,7 +392,6 @@ class TestPydanticV1ToV2(TransformerTestCase):
         result = module.visit(transformer)
 
         assert "import pydantic" == result.code
-        assert transformer._made_changes is True
 
     def test_leave_import_nested_pydantic_v1(self):
         """Test that leave_Import handles nested pydantic.v1 modules.
@@ -422,7 +406,6 @@ class TestPydanticV1ToV2(TransformerTestCase):
         result = module.visit(transformer)
 
         assert "import pydantic.fields.config" == result.code
-        assert transformer._made_changes is True
 
     def test_leave_import_non_pydantic_v1_not_changed(self):
         """Test that leave_Import ignores non-pydantic.v1 imports.
@@ -437,7 +420,6 @@ class TestPydanticV1ToV2(TransformerTestCase):
         result = module.visit(transformer)
 
         assert "import os.path" == result.code
-        assert transformer._made_changes is False
 
     def test_leave_import_mixed_with_other_imports(self):
         """Test leave_Import with pydantic.v1 among other imports.
@@ -451,7 +433,6 @@ class TestPydanticV1ToV2(TransformerTestCase):
         result = module.visit(transformer)
 
         assert "import os, pydantic, sys" == result.code
-        assert transformer._made_changes is True
 
     def test_build_module_name_single_part(self):
         """Test _build_module_name with a single part.
@@ -467,7 +448,6 @@ class TestPydanticV1ToV2(TransformerTestCase):
         # This should transform to 'from pydantic import BaseModel'
         # The _build_module_name is called with ['pydantic'] which has len==1
         assert "from pydantic import BaseModel" == result.code
-        assert transformer._made_changes is True
 
     def test_modify_file_skips_without_v1(self):
         """Test _modify_file returns False when pydantic.v1 not in content.
@@ -482,7 +462,7 @@ class TestPydanticV1ToV2(TransformerTestCase):
             module=parse_module("from pydantic import BaseModel"),
         )
         # _modify_file should return False because "pydantic.v1" is not in content
-        assert modifier._modify_file(file_data) is False
+        assert modifier.modify([file_data]) is False
 
     def test_modifier_processes_file_with_v1(self):
         """Test that modifier processes files containing pydantic.v1.
@@ -503,19 +483,9 @@ class TestPydanticV1ToV2(TransformerTestCase):
             )
             # _modify_file should return True because "pydantic.v1" is in content
             # and the transformation changes the code
-            assert modifier._modify_file(file_data) is True
+            assert modifier.modify([file_data]) is True
 
-    def test_get_module_parts_with_invalid_attribute_value(self):
-
-        transformer = self._create_transformer()
-        # Create an Attribute with an invalid value type (not Name or Attribute)
-        bad_attr = libcst.Attribute(
-            value=libcst.Integer("123"), attr=libcst.Name("x")
-        )
-        result = transformer._get_module_parts(bad_attr)
-        assert result == []
-
-    def _create_transformer(self) -> _PydanticV1ToV2Transformer:
-        return _PydanticV1ToV2Transformer(
+    def _create_transformer(self) -> CSTTransformer:
+        return PydanticV1ToV2().create_transformer(
             re.compile(r"#\s*ignore", re.IGNORECASE)
         )

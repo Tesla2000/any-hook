@@ -3,13 +3,10 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from textwrap import dedent
 
-from libcst import parse_module
+from libcst import CSTTransformer, parse_module
 
-from any_hook._file_data import FileData
-from any_hook.files_modifiers.len_as_bool import (
-    LenAsBool,
-    _LenAsBoolTransformer,
-)
+from any_hook import FileData
+from any_hook.files_modifiers.len_as_bool import LenAsBool
 from tests.modifiers._base import TransformerTestCase
 
 
@@ -166,7 +163,7 @@ class TestLenAsBool(TransformerTestCase):
             content="x = 5",
             module=parse_module("x = 5"),
         )
-        assert modifier._modify_file(file_data) is False
+        assert modifier.modify([file_data]) is False
 
     def test_if_len_ignored(self):
         code = dedent("""
@@ -209,7 +206,7 @@ class TestLenAsBool(TransformerTestCase):
             content="x = 5",
             module=parse_module("x = 5"),
         )
-        assert modifier._modify_file(file_data) is False
+        assert modifier.modify([file_data]) is False
 
     def test_modify_file_with_len_processes(self):
 
@@ -223,7 +220,9 @@ class TestLenAsBool(TransformerTestCase):
                 content=code,
                 module=parse_module(code),
             )
-            assert modifier._modify_file(file_data) is True
+            assert modifier.modify([file_data]) is True
 
-    def _create_transformer(self) -> _LenAsBoolTransformer:
-        return _LenAsBoolTransformer(re.compile(r"#\s*ignore", re.IGNORECASE))
+    def _create_transformer(self) -> CSTTransformer:
+        return LenAsBool().create_transformer(
+            re.compile(r"#\s*ignore", re.IGNORECASE)
+        )
