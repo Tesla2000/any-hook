@@ -27,7 +27,7 @@ wheels = [
 
 [[package]]
 name = "any-hook"
-version = "3.7.0"
+version = "3.11.0"
 source = { editable = "." }
 dependencies = [
     { name = "autoimport" },

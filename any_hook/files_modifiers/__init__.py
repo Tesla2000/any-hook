@@ -8,6 +8,7 @@ from any_hook.files_modifiers.agito import Agito
 from any_hook.files_modifiers.any_to_object import AnyToObject
 from any_hook.files_modifiers.check_untracked import CheckUntracked
 from any_hook.files_modifiers.combine_with import CombineWith
+from any_hook.files_modifiers.comment_detector import CommentDetector
 from any_hook.files_modifiers.field_validator_check import FieldValidatorCheck
 from any_hook.files_modifiers.forbidden_functions import ForbiddenFunctions
 from any_hook.files_modifiers.len_as_bool import LenAsBool
@@ -49,6 +50,7 @@ _modifier_types: list[type] = [
     TestIfChecker,
     Agito,
     CombineWith,
+    CommentDetector,
 ]
 __all__ = [
     "Modifier",
@@ -71,6 +73,7 @@ __all__ = [
     "OpenToPath",
     "CombineWith",
     "TestIfChecker",
+    "CommentDetector",
     "AnyModifier",
 ]
 try:
@@ -117,6 +120,7 @@ if TYPE_CHECKING:
             TestIfChecker,
             Agito,
             CombineWith,
+            CommentDetector,
             WorkflowEnvToExample,
             GenerateStubs,
         ],
