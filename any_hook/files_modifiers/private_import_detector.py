@@ -47,6 +47,12 @@ def _has_private_segment(module_str: str) -> bool:
     return any(_is_private(p) for p in module_str.split("."))
 
 
+def _is_allowed(file_package: str, target_parent: str) -> bool:
+    return file_package == target_parent or file_package.startswith(
+        target_parent + "."
+    )
+
+
 def _file_package(path: Path) -> str:
     parts = path.with_suffix("").parts
     if parts and parts[-1] == "__init__":
@@ -89,10 +95,9 @@ class _PrivateImportVisitor(CSTVisitor):
                             if "." in module_str
                             else ""
                         )
-                        if (
-                            self._file_package != parent
-                            and not self._has_ignore_comment(node)
-                        ):
+                        if not _is_allowed(
+                            self._file_package, parent
+                        ) and not self._has_ignore_comment(node):
                             self.violations.append(self._format(node))
                             break
         return True
@@ -111,7 +116,7 @@ class _PrivateImportVisitor(CSTVisitor):
         return True
 
     def _is_sibling(self, module_str: str) -> bool:
-        return self._file_package == _target_parent(module_str)
+        return _is_allowed(self._file_package, _target_parent(module_str))
 
     def _has_ignore_comment(self, node: Import | ImportFrom) -> bool:
         statement = SimpleStatementLine(body=[node])

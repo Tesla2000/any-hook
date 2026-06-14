@@ -199,6 +199,18 @@ class TestPrivateImportDetector(TransformerTestCase):
         """).lstrip()
         assert self._check_code(code, path=Path("other/bar.py"))
 
+    def test_child_package_can_import_parent_private_module(self):
+        code = dedent("""
+            from pkg._mod import Foo
+        """).lstrip()
+        assert not self._check_code(code, path=Path("pkg/sub/bar.py"))
+
+    def test_grandchild_package_can_import_ancestor_private_module(self):
+        code = dedent("""
+            from pkg._mod import Foo
+        """).lstrip()
+        assert not self._check_code(code, path=Path("pkg/sub/deep/bar.py"))
+
     def test_double_underscore_name_not_flagged(self):
         # __dunder__ names are not private by convention
         code = dedent("""

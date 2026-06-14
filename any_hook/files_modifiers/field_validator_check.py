@@ -1,6 +1,5 @@
 import re
 from collections.abc import Iterable
-from dataclasses import dataclass
 from typing import Literal
 
 from libcst import (
@@ -14,19 +13,10 @@ from libcst import (
     SimpleStatementLine,
     SimpleString,
 )
-from libcst._add_slots import add_slots
 from pydantic import field_validator
 
 from any_hook._file_data import FileData
 from any_hook.files_modifiers._base import Modifier
-
-
-@add_slots
-@dataclass(frozen=True)
-class CallDecorator(Decorator):
-    """A :class:`Decorator` whose ``decorator`` expression is a :class:`Call`."""
-
-    decorator: Call
 
 
 class _ClsUsageVisitor(CSTVisitor):
@@ -63,42 +53,37 @@ class _FieldValidatorVisitor(CSTVisitor):
         return True
 
     @staticmethod
-    def _find_field_validator_decorator(
-        node: FunctionDef,
-    ) -> CallDecorator | None:
-        for decorator in node.decorators:
-            call_decorator = _FieldValidatorVisitor._as_field_validator_call(
-                decorator
-            )
-            if call_decorator is not None:
-                return call_decorator
-        return None
-
-    @staticmethod
-    def _as_field_validator_call(decorator: Decorator) -> CallDecorator | None:
-        if not isinstance(decorator.decorator, Call):
-            return None
-        if not isinstance(decorator.decorator.func, Name):
-            return None
-        if decorator.decorator.func.value != field_validator.__name__:
-            return None
-        return CallDecorator(
-            decorator=decorator.decorator,
-            leading_lines=decorator.leading_lines,
-            whitespace_after_at=decorator.whitespace_after_at,
-            trailing_whitespace=decorator.trailing_whitespace,
+    def _find_field_validator_decorator(node: FunctionDef) -> Decorator | None:
+        return next(
+            (
+                d
+                for d in node.decorators
+                if _FieldValidatorVisitor._is_field_validator_call(d)
+            ),
+            None,
         )
 
     @staticmethod
-    def _extract_field_names(decorator: CallDecorator) -> list[str]:
-        names: list[str] = []
-        for arg in decorator.decorator.args:
-            if arg.keyword is not None:
-                continue
-            name = _FieldValidatorVisitor._extract_string_value(arg.value)
-            if isinstance(name, str):
-                names.append(name)
-        return names
+    def _is_field_validator_call(decorator: Decorator) -> bool:
+        return (
+            isinstance(decorator.decorator, Call)
+            and isinstance(decorator.decorator.func, Name)
+            and decorator.decorator.func.value == field_validator.__name__
+        )
+
+    @staticmethod
+    def _extract_field_names(decorator: Decorator) -> list[str]:
+        if not isinstance(decorator.decorator, Call):
+            return []
+        return [
+            name
+            for arg in decorator.decorator.args
+            if arg.keyword is None
+            for name in [
+                _FieldValidatorVisitor._extract_string_value(arg.value)
+            ]
+            if isinstance(name, str)
+        ]
 
     @staticmethod
     def _extract_string_value(value: object) -> str | bytes | None:
