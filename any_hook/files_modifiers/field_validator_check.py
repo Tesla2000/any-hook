@@ -1,6 +1,6 @@
 import re
 from collections.abc import Iterable
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from libcst import (
     Call,
@@ -14,9 +14,20 @@ from libcst import (
     SimpleString,
 )
 from pydantic import field_validator
+from typing_extensions import TypeIs
 
 from any_hook._file_data import FileData
 from any_hook.files_modifiers._base import Modifier
+
+if TYPE_CHECKING:
+    from dataclasses import dataclass
+
+    @dataclass(frozen=True)
+    class _CallDecorator(Decorator):
+        decorator: Call
+
+else:
+    _CallDecorator = Decorator
 
 
 class _ClsUsageVisitor(CSTVisitor):
@@ -53,7 +64,9 @@ class _FieldValidatorVisitor(CSTVisitor):
         return True
 
     @staticmethod
-    def _find_field_validator_decorator(node: FunctionDef) -> Decorator | None:
+    def _find_field_validator_decorator(
+        node: FunctionDef,
+    ) -> _CallDecorator | None:
         return next(
             (
                 d
@@ -64,7 +77,9 @@ class _FieldValidatorVisitor(CSTVisitor):
         )
 
     @staticmethod
-    def _is_field_validator_call(decorator: Decorator) -> bool:
+    def _is_field_validator_call(
+        decorator: Decorator,
+    ) -> TypeIs[_CallDecorator]:
         return (
             isinstance(decorator.decorator, Call)
             and isinstance(decorator.decorator.func, Name)
@@ -72,9 +87,7 @@ class _FieldValidatorVisitor(CSTVisitor):
         )
 
     @staticmethod
-    def _extract_field_names(decorator: Decorator) -> list[str]:
-        if not isinstance(decorator.decorator, Call):
-            return []
+    def _extract_field_names(decorator: _CallDecorator) -> list[str]:
         return [
             name
             for arg in decorator.decorator.args

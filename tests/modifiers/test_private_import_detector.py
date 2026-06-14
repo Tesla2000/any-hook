@@ -218,6 +218,33 @@ class TestPrivateImportDetector(TransformerTestCase):
         """).lstrip()
         assert not self._check_code(code, path=Path("other/bar.py"))
 
+    def test_bare_import_with_only_public_modules_no_violation(self):
+        code = dedent("""
+            import os, sys
+        """).lstrip()
+        assert not self._check_code(code, path=Path("other/bar.py"))
+
+    def test_bare_import_continues_past_allowed_private_to_find_violation(
+        self,
+    ):
+        # first alias is private but allowed (sibling); second is private and not allowed
+        code = dedent("""
+            import pkg._sub, other._mod
+        """).lstrip()
+        assert self._check_code(code, path=Path("pkg/bar.py"))
+
+    def test_ignore_comment_suppresses_bare_import_violation(self):
+        code = dedent("""
+            import pkg._sub  # ignore
+        """).lstrip()
+        assert not self._check_code(code, path=Path("other/bar.py"))
+
+    def test_from_import_with_no_module_and_relative(self):
+        code = dedent("""
+            from . import something
+        """).lstrip()
+        assert not self._check_code(code, path=Path("pkg/bar.py"))
+
     def _check_code(self, code: str, path: Path = Path("test.py")) -> bool:
         file_data = FileData(
             path=path, content=code, module=parse_module(code)

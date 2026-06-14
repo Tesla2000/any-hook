@@ -88,7 +88,7 @@ try:
 
     _modifier_types.append(WorkflowEnvToExample)
     __all__.append("WorkflowEnvToExample")
-except ImportError as e:  # pragma: no cover
+except ImportError as e:
     _logger.warning(
         "Package necessary to use workflow-env-to-example is not installed, "
         f"workflow-env-to-example is disabled.\n{e}"
@@ -98,7 +98,7 @@ try:
 
     _modifier_types.append(GenerateStubs)
     __all__.append("GenerateStubs")
-except ImportError as e:  # pragma: no cover
+except ImportError as e:
     _logger.warning(
         "Package necessary to use generate-stubs is not installed, "
         f"generate-stubs is disabled.\n{e}"

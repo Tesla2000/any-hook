@@ -1,14 +1,12 @@
 import re
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
+import libcst as cst
 from libcst import (
-    Attribute,
-    CSTNode,
     CSTVisitor,
     Import,
-    ImportAlias,
     ImportFrom,
     ImportStar,
     Module,
@@ -17,16 +15,19 @@ from libcst import (
 )
 from pydantic import Field
 
+if TYPE_CHECKING:
+    from libcst import ImportAttribute
+else:
+    ImportAttribute = cst.Attribute
+
 from any_hook._file_data import FileData
 from any_hook.files_modifiers._base import Modifier
 
 
-def _dotted_name(node: CSTNode) -> str:
+def _dotted_name(node: "ImportAttribute | Name") -> str:
     if isinstance(node, Name):
         return node.value
-    if isinstance(node, Attribute):
-        return f"{_dotted_name(node.value)}.{node.attr.value}"
-    return ""
+    return f"{_dotted_name(node.value)}.{node.attr.value}"
 
 
 def _target_parent(module_str: str) -> str:
@@ -74,9 +75,7 @@ class _PrivateImportVisitor(CSTVisitor):
         self.violations: list[str] = []
 
     def visit_ImportFrom(self, node: ImportFrom) -> bool:
-        if node.relative:
-            return True
-        if node.module is None:
+        if node.relative or node.module is None:
             return True
         module_str = _dotted_name(node.module)
         if _has_private_segment(module_str):
@@ -86,25 +85,20 @@ class _PrivateImportVisitor(CSTVisitor):
                 self.violations.append(self._format(node))
         elif not isinstance(node.names, ImportStar):
             for alias in node.names:
-                if isinstance(alias, ImportAlias) and isinstance(
-                    alias.name, Name
-                ):
-                    if _is_private(alias.name.value):
-                        parent = (
-                            ".".join(module_str.split(".")[:-1])
-                            if "." in module_str
-                            else ""
-                        )
-                        if not _is_allowed(
-                            self._file_package, parent
-                        ) and not self._has_ignore_comment(node):
-                            self.violations.append(self._format(node))
-                            break
+                if _is_private(alias.name.value):
+                    parent = (
+                        ".".join(module_str.split(".")[:-1])
+                        if "." in module_str
+                        else ""
+                    )
+                    if not _is_allowed(
+                        self._file_package, parent
+                    ) and not self._has_ignore_comment(node):
+                        self.violations.append(self._format(node))
+                        break
         return True
 
     def visit_Import(self, node: Import) -> bool:
-        if isinstance(node.names, ImportStar):
-            return True
         for alias in node.names:
             module_str = _dotted_name(alias.name)
             if _has_private_segment(module_str) and not self._is_sibling(
