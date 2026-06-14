@@ -16,6 +16,9 @@ from any_hook.files_modifiers.local_imports import LocalImports
 from any_hook.files_modifiers.local_imports_to_top import LocalImportsToTop
 from any_hook.files_modifiers.object_to_any import ObjectToAny
 from any_hook.files_modifiers.open_to_path import OpenToPath
+from any_hook.files_modifiers.private_import_detector import (
+    PrivateImportDetector,
+)
 from any_hook.files_modifiers.pydantic_config_to_model_config import (
     PydanticConfigToModelConfig,
 )
@@ -51,6 +54,7 @@ _modifier_types: list[type] = [
     Agito,
     CombineWith,
     CommentDetector,
+    PrivateImportDetector,
 ]
 __all__ = [
     "Modifier",
@@ -74,6 +78,7 @@ __all__ = [
     "CombineWith",
     "TestIfChecker",
     "CommentDetector",
+    "PrivateImportDetector",
     "AnyModifier",
 ]
 try:
@@ -121,6 +126,7 @@ if TYPE_CHECKING:
             Agito,
             CombineWith,
             CommentDetector,
+            PrivateImportDetector,
             WorkflowEnvToExample,
             GenerateStubs,
         ],
