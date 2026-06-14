@@ -718,6 +718,35 @@ x = 1  # TODO: fix this later  # flagged
 y = 2  # just a note            # not flagged
 ```
 
+### private-import-detector
+
+Detects imports of private elements (names or modules starting with `_`) from outside their directory. Enforces the rule that private = directory-local: only siblings (files in the same directory) and the package's own `__init__.py` may import private members directly.
+
+**What it does:**
+- Flags `from pkg._mod import Foo` when the importing file is not in `pkg/`
+- Flags `from pkg.mod import _name` when the importing file is not in `pkg/`
+- Flags `import pkg._sub` when the importing file is not in `pkg/`
+- Allows all relative imports (`from . import _x`, `from ._x import Y`)
+- Allows imports suppressed with `# ignore`
+
+**Configuration:**
+- `source_roots`: tuple of source root directories used to derive package paths (default: `(".",)`)
+
+**Example:**
+```json
+{
+  "type": "private-import-detector",
+  "source_roots": ["src"]
+}
+```
+
+```python
+# pkg/_internal.py contains _helper()
+from pkg._internal import _helper   # flagged (outside pkg/)
+from pkg._internal import _helper   # not flagged (inside pkg/)
+from . import _internal              # not flagged (relative import)
+```
+
 ### workflow-env-to-example
 
 Extracts environment variables from GitHub Actions workflow files and generates `.env.example`.
