@@ -693,6 +693,31 @@ from pydantic import BaseModel
 from pydantic.v1 import BaseModel
 ```
 
+### comment-detector
+
+Detects inline and standalone comments matching user-specified regex patterns.
+
+**What it does:**
+- Visits every `Comment` node in the Python CST
+- Reports a violation for any comment whose text matches at least one configured pattern
+- Does not modify files
+
+**Configuration:**
+- `patterns`: required tuple of regex strings — any comment matching one is flagged
+
+**Example:**
+```json
+{
+  "type": "comment-detector",
+  "patterns": ["TODO", "FIXME", "HACK"]
+}
+```
+
+```python
+x = 1  # TODO: fix this later  # flagged
+y = 2  # just a note            # not flagged
+```
+
 ### workflow-env-to-example
 
 Extracts environment variables from GitHub Actions workflow files and generates `.env.example`.
