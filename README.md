@@ -793,8 +793,16 @@ Detects unneeded `InstanceOf[Model]` usages where `Model` is already a Pydantic 
 
 **Configuration:**
 - `source_roots`: tuple of source root directories used to resolve imported modules to files (default: `(".",)`)
+- `extra_sys_path`: tuple of additional directories searched when resolving imports of installed packages, e.g. the linted project's `.venv/lib/python3.12/site-packages` — needed when running as an isolated pre-commit hook, since the hook's own environment won't otherwise see the project's dependencies (default: `()`)
 
 **Example:**
+```json
+{
+  "type": "instance-of-pydantic-model-detector",
+  "extra_sys_path": [".venv/lib/python3.12/site-packages"]
+}
+```
+
 ```python
 from pydantic import BaseModel, InstanceOf
 

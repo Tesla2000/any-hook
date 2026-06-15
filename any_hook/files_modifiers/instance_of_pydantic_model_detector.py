@@ -38,11 +38,12 @@ class _InstanceOfVisitor(CSTVisitor):
         file_data: FileData,
         ignore_pattern: re.Pattern[str],
         source_roots: tuple[str, ...],
+        extra_sys_path: tuple[str, ...],
     ) -> None:
         super().__init__()
         self._file_data = file_data
         self._ignore_pattern = ignore_pattern
-        self._tracker = ImportPathTracker(source_roots)
+        self._tracker = ImportPathTracker(source_roots, extra_sys_path)
         self._instance_of_names: set[str] = set()
         self._pydantic_module_names: set[str] = set()
         self.violations: list[str] = []
@@ -176,6 +177,10 @@ class InstanceOfPydanticModelDetector(Modifier):
         default=(".",),
         description="Source root directories used to resolve imported modules to files.",
     )
+    extra_sys_path: tuple[str, ...] = Field(
+        default=(),
+        description="Additional directories (e.g. '.venv/lib/python3.12/site-packages') to search when resolving imported modules from installed packages.",
+    )
 
     def modify(self, data: Iterable[FileData]) -> bool:
         return any(list(map(self._check_file, data)))
@@ -185,7 +190,7 @@ class InstanceOfPydanticModelDetector(Modifier):
             return False
         compiled_pattern = re.compile(self.ignore_pattern, re.IGNORECASE)
         visitor = _InstanceOfVisitor(
-            file_data, compiled_pattern, self.source_roots
+            file_data, compiled_pattern, self.source_roots, self.extra_sys_path
         )
         file_data.module.visit(visitor)
         if not visitor.violations:

@@ -39,13 +39,23 @@ class _ImportPathTracker:
     the target bases, following imports across project files and installed
     packages.
 
+    `extra_sys_path` allows resolving packages installed in a target
+    project's virtual environment (e.g. ".venv/lib/python3.12/site-packages")
+    that aren't visible to the current interpreter, such as when running as
+    an isolated pre-commit hook.
+
     Note: Resolution terminates as soon as a literal target base name is
     encountered (e.g. "BaseModel"), without needing to inspect the source
     of the module that defines it.
     """
 
-    def __init__(self, source_roots: tuple[str, ...] = (".",)) -> None:
+    def __init__(
+        self,
+        source_roots: tuple[str, ...] = (".",),
+        extra_sys_path: tuple[str, ...] = (),
+    ) -> None:
         self._source_roots = source_roots
+        self._extra_sys_path = extra_sys_path
         self._module_cache: dict[Path, Module] = {}
 
     def is_subclass_via_imports(
@@ -215,7 +225,7 @@ class _ImportPathTracker:
             for _ in range(relative_dots - 1):
                 base = base.parent
             return self._module_parts_to_file(base, module_parts)
-        for root in self._source_roots:
+        for root in self._source_roots + self._extra_sys_path:
             resolved = self._module_parts_to_file(Path(root), module_parts)
             if resolved is not None:
                 return resolved

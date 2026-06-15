@@ -88,6 +88,40 @@ class TestImportPathTracker:
             "X", module, usage_path, {"BaseModel"}
         )
 
+    def test_resolves_via_extra_sys_path(self, tmp_path: Path):
+        extra_root = tmp_path / "extra"
+        extra_root.mkdir()
+        (extra_root / "models.py").write_text(dedent("""
+                from pydantic import BaseModel
+                class Model(BaseModel):
+                    pass
+            """).lstrip())
+        usage_path = tmp_path / "usage.py"
+        usage_code = "from models import Model\n"
+        module = parse_module(usage_code)
+        tracker = ImportPathTracker(
+            source_roots=(str(tmp_path),), extra_sys_path=(str(extra_root),)
+        )
+        assert tracker.is_subclass_via_imports(
+            "Model", module, usage_path, {"BaseModel"}
+        )
+
+    def test_does_not_resolve_without_extra_sys_path(self, tmp_path: Path):
+        extra_root = tmp_path / "extra"
+        extra_root.mkdir()
+        (extra_root / "models.py").write_text(dedent("""
+                from pydantic import BaseModel
+                class Model(BaseModel):
+                    pass
+            """).lstrip())
+        usage_path = tmp_path / "usage.py"
+        usage_code = "from models import Model\n"
+        module = parse_module(usage_code)
+        tracker = ImportPathTracker(source_roots=(str(tmp_path),))
+        assert not tracker.is_subclass_via_imports(
+            "Model", module, usage_path, {"BaseModel"}
+        )
+
     def test_unresolvable_builtin_module_returns_false(self, tmp_path: Path):
         usage_path = tmp_path / "usage.py"
         usage_code = "from sys import implementation as X\n"
