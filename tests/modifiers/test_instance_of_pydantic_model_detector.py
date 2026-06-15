@@ -107,6 +107,91 @@ class TestInstanceOfPydanticModelDetector:
         """).lstrip()
         assert not self._check_code(code)
 
+    def test_dotted_attribute_argument_cross_file(self, tmp_path: Path):
+        (tmp_path / "models.py").write_text(dedent("""
+                from pydantic import BaseModel
+                class Model(BaseModel):
+                    pass
+            """).lstrip())
+        code = dedent("""
+            import models
+            from pydantic import InstanceOf
+            class Container:
+                model: InstanceOf[models.Model]
+        """).lstrip()
+        usage_path = tmp_path / "usage.py"
+        file_data = FileData(
+            path=usage_path, content=code, module=parse_module(code)
+        )
+        modifier = InstanceOfPydanticModelDetector(
+            source_roots=(str(tmp_path),)
+        )
+        assert modifier.modify([file_data])
+
+    def test_star_import_is_ignored(self):
+        code = dedent("""
+            from pydantic import *
+            from pydantic import BaseModel, InstanceOf
+            class Model(BaseModel):
+                pass
+            class Container(BaseModel):
+                model: InstanceOf[Model]
+        """).lstrip()
+        assert self._check_code(code)
+
+    def test_non_pydantic_import_is_ignored(self):
+        code = dedent("""
+            import os
+            import pydantic
+            class Model(pydantic.BaseModel):
+                pass
+            class Container(pydantic.BaseModel):
+                model: pydantic.InstanceOf[Model]
+        """).lstrip()
+        assert self._check_code(code)
+
+    def test_unrelated_subscripts_are_ignored(self):
+        code = dedent("""
+            from pydantic import BaseModel, InstanceOf
+            class Model(BaseModel):
+                pass
+            class Container(BaseModel):
+                model: InstanceOf[Model]
+            data = [[1, 2], [3, 4]]
+            x = data[0][1]
+        """).lstrip()
+        assert self._check_code(code)
+
+    def test_instance_of_with_multiple_arguments_ignored(self):
+        code = dedent("""
+            from pydantic import BaseModel, InstanceOf
+            class Model(BaseModel):
+                pass
+            class Other:
+                pass
+            class Container(BaseModel):
+                model: InstanceOf[Model, Other]
+        """).lstrip()
+        assert not self._check_code(code)
+
+    def test_instance_of_with_slice_argument_ignored(self):
+        code = dedent("""
+            from pydantic import BaseModel, InstanceOf
+            class Model(BaseModel):
+                pass
+            class Container(BaseModel):
+                model: InstanceOf[1:2]
+        """).lstrip()
+        assert not self._check_code(code)
+
+    def test_instance_of_with_literal_argument_ignored(self):
+        code = dedent("""
+            from pydantic import InstanceOf
+            class Container:
+                model: InstanceOf[42]
+        """).lstrip()
+        assert not self._check_code(code)
+
     def _check_code(self, code: str) -> bool:
         file_data = FileData(
             path=Path("test.py"), content=code, module=parse_module(code)

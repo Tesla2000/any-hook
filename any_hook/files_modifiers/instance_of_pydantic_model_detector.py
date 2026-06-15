@@ -1,10 +1,9 @@
 import re
 from collections.abc import Iterable
-from typing import Literal
+from typing import Literal, cast
 
 from libcst import (
     Attribute,
-    BaseExpression,
     ClassDef,
     CSTVisitor,
     Expr,
@@ -24,12 +23,13 @@ from any_hook.files_modifiers._base import Modifier
 from any_hook.services import ClassHierarchyDetector, ImportPathTracker
 
 
-def _dotted_name(node: BaseExpression) -> str:
+def _dotted_name(node: Name | Attribute) -> str:
     if isinstance(node, Name):
         return node.value
-    if isinstance(node, Attribute):
-        return f"{_dotted_name(node.value)}.{node.attr.value}"
-    raise TypeError(f"Unsupported node type for dotted name: {type(node)}")
+    return (
+        f"{_dotted_name(cast(Name | Attribute, node.value))}"
+        f".{node.attr.value}"
+    )
 
 
 class _InstanceOfVisitor(CSTVisitor):
@@ -54,12 +54,10 @@ class _InstanceOfVisitor(CSTVisitor):
         if _dotted_name(node.module) != "pydantic":
             return True
         for alias in node.names:
-            if not isinstance(alias.name, Name):
-                continue
             if alias.name.value != "InstanceOf":
                 continue
             local_name = (
-                _dotted_name(alias.asname.name)
+                cast(Name, alias.asname.name).value
                 if alias.asname is not None
                 else alias.name.value
             )
@@ -71,7 +69,7 @@ class _InstanceOfVisitor(CSTVisitor):
             if _dotted_name(alias.name) != "pydantic":
                 continue
             local_name = (
-                _dotted_name(alias.asname.name)
+                cast(Name, alias.asname.name).value
                 if alias.asname is not None
                 else _dotted_name(alias.name)
             )

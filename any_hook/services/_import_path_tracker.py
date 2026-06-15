@@ -1,10 +1,10 @@
 import importlib.util
 from pathlib import Path
+from typing import cast
 
 import libcst as cst
 from libcst import (
     Attribute,
-    BaseExpression,
     ClassDef,
     Import,
     ImportAlias,
@@ -20,17 +20,18 @@ from any_hook.services._class_hierarchy_detector import (
 )
 
 
-def _dotted_name(node: BaseExpression) -> str:
+def _dotted_name(node: Name | Attribute) -> str:
     if isinstance(node, Name):
         return node.value
-    if isinstance(node, Attribute):
-        return f"{_dotted_name(node.value)}.{node.attr.value}"
-    raise TypeError(f"Unsupported node type for dotted name: {type(node)}")
+    return (
+        f"{_dotted_name(cast(Name | Attribute, node.value))}"
+        f".{node.attr.value}"
+    )
 
 
 def _alias_local_name(alias: ImportAlias) -> str:
     if alias.asname is not None:
-        return _dotted_name(alias.asname.name)
+        return cast(Name, alias.asname.name).value
     return _dotted_name(alias.name)
 
 
@@ -201,7 +202,7 @@ class _ImportPathTracker:
         for alias in node.names:
             module_parts = _dotted_name(alias.name).split(".")
             local_name = (
-                _dotted_name(alias.asname.name)
+                cast(Name, alias.asname.name).value
                 if alias.asname is not None
                 else module_parts[0]
             )
@@ -248,8 +249,6 @@ class _ImportPathTracker:
     @staticmethod
     def _find_spec_file(module_parts: list[str]) -> Path | None:
         module_str = ".".join(module_parts)
-        if not module_str:
-            return None
         try:
             spec = importlib.util.find_spec(module_str)
         except (ImportError, ModuleNotFoundError, ValueError):
