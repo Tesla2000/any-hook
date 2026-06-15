@@ -5,6 +5,9 @@ from pydantic import Field
 
 from any_hook.files_modifiers._base import Modifier
 from any_hook.files_modifiers.agito import Agito
+from any_hook.files_modifiers.arbitrary_types_allowed_check import (
+    ArbitraryTypesAllowedCheck,
+)
 from any_hook.files_modifiers.any_to_object import AnyToObject
 from any_hook.files_modifiers.check_untracked import CheckUntracked
 from any_hook.files_modifiers.combine_with import CombineWith
@@ -55,6 +58,7 @@ _modifier_types: list[type] = [
     CombineWith,
     CommentDetector,
     PrivateImportDetector,
+    ArbitraryTypesAllowedCheck,
 ]
 __all__ = [
     "Modifier",
@@ -79,6 +83,7 @@ __all__ = [
     "TestIfChecker",
     "CommentDetector",
     "PrivateImportDetector",
+    "ArbitraryTypesAllowedCheck",
     "AnyModifier",
 ]
 try:
@@ -127,6 +132,7 @@ if TYPE_CHECKING:
             CombineWith,
             CommentDetector,
             PrivateImportDetector,
+            ArbitraryTypesAllowedCheck,
             WorkflowEnvToExample,
             GenerateStubs,
         ],

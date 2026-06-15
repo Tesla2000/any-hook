@@ -18,6 +18,7 @@ A collection of customizable pre-commit hooks for Python code quality and transf
 - [Available Modifiers](#available-modifiers)
   - [agito](#agito)
   - [any-to-object](#any-to-object)
+  - [arbitrary-types-allowed-check](#arbitrary-types-allowed-check)
   - [check-untracked](#check-untracked)
   - [combine-with](#combine-with)
   - [field-validator-check](#field-validator-check)
@@ -457,6 +458,32 @@ def validate_name(cls, v):
 @classmethod
 def validate_all(cls, v):
     return cls._clean(v)
+```
+
+### arbitrary-types-allowed-check
+
+Detects `arbitrary_types_allowed=True` in Pydantic `model_config`.
+
+**What it does:**
+- Reports `model_config = ConfigDict(arbitrary_types_allowed=True)` (with or without a `ClassVar[ConfigDict]` annotation)
+- Suggests using `InstanceOf` for the offending field types instead
+
+**Example:**
+```python
+# Flagged
+class Model(BaseModel):
+    value: SomeArbitraryType
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+# OK
+class Model(BaseModel):
+    value: InstanceOf[SomeArbitraryType]
+    model_config = ConfigDict()
+
+# Suppressed
+class Model(BaseModel):
+    value: SomeArbitraryType
+    model_config = ConfigDict(arbitrary_types_allowed=True)  # ignore
 ```
 
 ### utcnow-to-datetime-now
