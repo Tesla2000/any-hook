@@ -18,6 +18,7 @@ A collection of customizable pre-commit hooks for Python code quality and transf
 - [Available Modifiers](#available-modifiers)
   - [agito](#agito)
   - [any-to-object](#any-to-object)
+  - [arbitrary-types-allowed-check](#arbitrary-types-allowed-check)
   - [check-untracked](#check-untracked)
   - [combine-with](#combine-with)
   - [field-validator-check](#field-validator-check)
@@ -458,6 +459,39 @@ def validate_name(cls, v):
 def validate_all(cls, v):
     return cls._clean(v)
 ```
+
+### arbitrary-types-allowed-check
+
+Detects `arbitrary_types_allowed=True` in Pydantic `model_config`.
+
+**What it does:**
+- Reports `model_config = ConfigDict(arbitrary_types_allowed=True)` (with or without a `ClassVar[ConfigDict]` annotation)
+- Suggests using `InstanceOf` for the offending field types instead
+
+**Example:**
+```python
+# Flagged
+class Model(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+# OK
+class Model(BaseModel):
+    value: InstanceOf[SomeArbitraryType]
+    model_config = ConfigDict()
+
+# Suppressed
+class Model(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)  # ignore
+```
+
+**Known limitation:**
+Only `model_config = ConfigDict(arbitrary_types_allowed=True)` is detected (with
+or without a `ClassVar[ConfigDict]` annotation). The legacy
+`class Config: arbitrary_types_allowed = True` form and
+`model_config = {"arbitrary_types_allowed": True}` dict form are not flagged.
+Use this hook together with [pydantic-config-to-model-config](#pydantic-config-to-model-config),
+which normalizes both forms into `ConfigDict`, so this check can catch them
+afterwards.
 
 ### utcnow-to-datetime-now
 
