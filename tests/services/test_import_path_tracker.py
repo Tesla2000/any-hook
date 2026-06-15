@@ -31,13 +31,11 @@ class TestImportPathTracker:
         )
 
     def test_cross_file_import(self, tmp_path: Path):
-        (tmp_path / "models.py").write_text(
-            dedent("""
+        (tmp_path / "models.py").write_text(dedent("""
                 from pydantic import BaseModel
                 class Model(BaseModel):
                     pass
-            """).lstrip()
-        )
+            """).lstrip())
         usage_path = tmp_path / "usage.py"
         usage_code = "from models import Model\n"
         module = parse_module(usage_code)
@@ -47,13 +45,11 @@ class TestImportPathTracker:
         )
 
     def test_cross_file_aliased_import(self, tmp_path: Path):
-        (tmp_path / "models.py").write_text(
-            dedent("""
+        (tmp_path / "models.py").write_text(dedent("""
                 from pydantic import BaseModel
                 class Model(BaseModel):
                     pass
-            """).lstrip()
-        )
+            """).lstrip())
         usage_path = tmp_path / "usage.py"
         usage_code = "from models import Model as M\n"
         module = parse_module(usage_code)
@@ -65,20 +61,16 @@ class TestImportPathTracker:
     def test_recursive_resolution_through_intermediate_base(
         self, tmp_path: Path
     ):
-        (tmp_path / "base.py").write_text(
-            dedent("""
+        (tmp_path / "base.py").write_text(dedent("""
                 from pydantic import BaseModel
                 class CommonBase(BaseModel):
                     pass
-            """).lstrip()
-        )
-        (tmp_path / "models.py").write_text(
-            dedent("""
+            """).lstrip())
+        (tmp_path / "models.py").write_text(dedent("""
                 from base import CommonBase
                 class Model(CommonBase):
                     pass
-            """).lstrip()
-        )
+            """).lstrip())
         usage_path = tmp_path / "usage.py"
         usage_code = "from models import Model\n"
         module = parse_module(usage_code)
@@ -106,20 +98,16 @@ class TestImportPathTracker:
         )
 
     def test_cycle_protection(self, tmp_path: Path):
-        (tmp_path / "a.py").write_text(
-            dedent("""
+        (tmp_path / "a.py").write_text(dedent("""
                 from b import ClsB
                 class ClsA(ClsB):
                     pass
-            """).lstrip()
-        )
-        (tmp_path / "b.py").write_text(
-            dedent("""
+            """).lstrip())
+        (tmp_path / "b.py").write_text(dedent("""
                 from a import ClsA
                 class ClsB(ClsA):
                     pass
-            """).lstrip()
-        )
+            """).lstrip())
         usage_path = tmp_path / "usage.py"
         usage_code = "from a import ClsA\n"
         module = parse_module(usage_code)
@@ -129,13 +117,11 @@ class TestImportPathTracker:
         )
 
     def test_attribute_import_resolution(self, tmp_path: Path):
-        (tmp_path / "models.py").write_text(
-            dedent("""
+        (tmp_path / "models.py").write_text(dedent("""
                 from pydantic import BaseModel
                 class Model(BaseModel):
                     pass
-            """).lstrip()
-        )
+            """).lstrip())
         usage_path = tmp_path / "usage.py"
         usage_code = "import models\n"
         module = parse_module(usage_code)

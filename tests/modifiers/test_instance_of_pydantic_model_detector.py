@@ -51,13 +51,11 @@ class TestInstanceOfPydanticModelDetector:
         assert self._check_code(code)
 
     def test_cross_file_import_flags_violation(self, tmp_path: Path):
-        (tmp_path / "models.py").write_text(
-            dedent("""
+        (tmp_path / "models.py").write_text(dedent("""
                 from pydantic import BaseModel
                 class Model(BaseModel):
                     pass
-            """).lstrip()
-        )
+            """).lstrip())
         code = dedent("""
             from pydantic import InstanceOf
             from models import Model
