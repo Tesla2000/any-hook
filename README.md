@@ -472,7 +472,6 @@ Detects `arbitrary_types_allowed=True` in Pydantic `model_config`.
 ```python
 # Flagged
 class Model(BaseModel):
-    value: SomeArbitraryType
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 # OK
@@ -482,9 +481,17 @@ class Model(BaseModel):
 
 # Suppressed
 class Model(BaseModel):
-    value: SomeArbitraryType
     model_config = ConfigDict(arbitrary_types_allowed=True)  # ignore
 ```
+
+**Known limitation:**
+Only `model_config = ConfigDict(arbitrary_types_allowed=True)` is detected (with
+or without a `ClassVar[ConfigDict]` annotation). The legacy
+`class Config: arbitrary_types_allowed = True` form and
+`model_config = {"arbitrary_types_allowed": True}` dict form are not flagged.
+Use this hook together with [pydantic-config-to-model-config](#pydantic-config-to-model-config),
+which normalizes both forms into `ConfigDict`, so this check can catch them
+afterwards.
 
 ### utcnow-to-datetime-now
 

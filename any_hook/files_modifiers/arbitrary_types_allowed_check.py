@@ -88,7 +88,6 @@ class ArbitraryTypesAllowedCheck(Modifier):
     Examples:
         Violation:
             >>> class Model(BaseModel):
-            ...     value: SomeArbitraryType
             ...     model_config = ConfigDict(arbitrary_types_allowed=True)
 
         No violation:
@@ -98,8 +97,16 @@ class ArbitraryTypesAllowedCheck(Modifier):
 
         Suppressed:
             >>> class Model(BaseModel):
-            ...     value: SomeArbitraryType
             ...     model_config = ConfigDict(arbitrary_types_allowed=True)  # ignore
+
+    Known limitations:
+        Only `model_config = ConfigDict(arbitrary_types_allowed=True)` (with or
+        without a `ClassVar[ConfigDict]` annotation) is detected. The legacy
+        `class Config: arbitrary_types_allowed = True` form and
+        `model_config = {"arbitrary_types_allowed": True}` dict form are not
+        flagged. Run this hook together with PydanticConfigToModelConfig,
+        which normalizes both of those forms into `ConfigDict`, so this check
+        can catch them afterwards.
     """
 
     type: Literal["arbitrary-types-allowed-check"] = (

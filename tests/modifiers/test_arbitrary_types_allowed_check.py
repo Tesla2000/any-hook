@@ -14,7 +14,6 @@ class TestArbitraryTypesAllowedCheck(TransformerTestCase):
     def test_arbitrary_types_allowed_true_is_violation(self):
         code = dedent("""
             class Model(BaseModel):
-                value: SomeArbitraryType
                 model_config = ConfigDict(arbitrary_types_allowed=True)
         """).lstrip()
         assert self._check(code)
@@ -22,7 +21,6 @@ class TestArbitraryTypesAllowedCheck(TransformerTestCase):
     def test_arbitrary_types_allowed_true_with_class_var_annotation(self):
         code = dedent("""
             class Model(BaseModel):
-                value: SomeArbitraryType
                 model_config: ClassVar[ConfigDict] = ConfigDict(arbitrary_types_allowed=True)
         """).lstrip()
         assert self._check(code)
@@ -30,7 +28,6 @@ class TestArbitraryTypesAllowedCheck(TransformerTestCase):
     def test_arbitrary_types_allowed_false_no_violation(self):
         code = dedent("""
             class Model(BaseModel):
-                value: SomeArbitraryType
                 model_config = ConfigDict(arbitrary_types_allowed=False)
         """).lstrip()
         assert not self._check(code)
@@ -38,7 +35,6 @@ class TestArbitraryTypesAllowedCheck(TransformerTestCase):
     def test_arbitrary_types_allowed_non_literal_no_violation(self):
         code = dedent("""
             class Model(BaseModel):
-                value: SomeArbitraryType
                 model_config = ConfigDict(arbitrary_types_allowed=some_flag)
         """).lstrip()
         assert not self._check(code)
@@ -46,7 +42,6 @@ class TestArbitraryTypesAllowedCheck(TransformerTestCase):
     def test_config_dict_without_arbitrary_types_allowed_no_violation(self):
         code = dedent("""
             class Model(BaseModel):
-                value: InstanceOf[SomeArbitraryType]
                 model_config = ConfigDict(frozen=True)
         """).lstrip()
         assert not self._check(code)
@@ -54,7 +49,6 @@ class TestArbitraryTypesAllowedCheck(TransformerTestCase):
     def test_ignore_comment_suppresses_violation(self):
         code = dedent("""
             class Model(BaseModel):
-                value: SomeArbitraryType
                 model_config = ConfigDict(arbitrary_types_allowed=True)  # ignore
         """).lstrip()
         assert not self._check(code)
@@ -62,7 +56,7 @@ class TestArbitraryTypesAllowedCheck(TransformerTestCase):
     def test_no_model_config_no_violation(self):
         code = dedent("""
             class Model(BaseModel):
-                value: InstanceOf[SomeArbitraryType]
+                value: int
         """).lstrip()
         assert not self._check(code)
 
@@ -73,11 +67,9 @@ class TestArbitraryTypesAllowedCheck(TransformerTestCase):
     def test_multiple_classes_reports_each(self):
         code = dedent("""
             class First(BaseModel):
-                value: SomeArbitraryType
                 model_config = ConfigDict(arbitrary_types_allowed=True)
 
             class Second(BaseModel):
-                value: OtherArbitraryType
                 model_config = ConfigDict(arbitrary_types_allowed=True)
         """).lstrip()
         assert self._check(code)
@@ -85,7 +77,6 @@ class TestArbitraryTypesAllowedCheck(TransformerTestCase):
     def test_excluded_path_with_arbitrary_types_allowed(self):
         code = dedent("""
             class Model(BaseModel):
-                value: SomeArbitraryType
                 model_config = ConfigDict(arbitrary_types_allowed=True)
         """).lstrip()
         modifier = ArbitraryTypesAllowedCheck(excluded_paths=["test.py"])
@@ -97,8 +88,22 @@ class TestArbitraryTypesAllowedCheck(TransformerTestCase):
     def test_other_config_kwarg_not_called_config_dict_no_violation(self):
         code = dedent("""
             class Model(BaseModel):
-                value: SomeArbitraryType
                 model_config = dict(arbitrary_types_allowed=True)
+        """).lstrip()
+        assert not self._check(code)
+
+    def test_class_config_arbitrary_types_allowed_not_detected(self):
+        code = dedent("""
+            class Model(BaseModel):
+                class Config:
+                    arbitrary_types_allowed = True
+        """).lstrip()
+        assert not self._check(code)
+
+    def test_dict_model_config_arbitrary_types_allowed_not_detected(self):
+        code = dedent("""
+            class Model(BaseModel):
+                model_config = {"arbitrary_types_allowed": True}
         """).lstrip()
         assert not self._check(code)
 
