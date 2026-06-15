@@ -33,7 +33,10 @@ class _ArbitraryTypesAllowedVisitor(CSTVisitor):
     def visit_AnnAssign(self, node: AnnAssign) -> bool:
         if node.value is None:
             return True
-        if isinstance(node.target, Name) and node.target.value == "model_config":
+        if (
+            isinstance(node.target, Name)
+            and node.target.value == "model_config"
+        ):
             self._check_value(node.value)
         return True
 
@@ -74,7 +77,8 @@ class _ArbitraryTypesAllowedVisitor(CSTVisitor):
 
     def _is_ignored(self) -> bool:
         return any(
-            _ARBITRARY_TYPES_ALLOWED in line and self._ignore_pattern.search(line)
+            _ARBITRARY_TYPES_ALLOWED in line
+            and self._ignore_pattern.search(line)
             for line in self._content.splitlines()
         )
 
