@@ -46,6 +46,21 @@ class TestArbitraryTypesAllowedCheck(TransformerTestCase):
         """).lstrip()
         assert not self._check(code)
 
+    def test_ann_assign_model_config_without_value_no_violation(self):
+        code = dedent("""
+            class Model(BaseModel):
+                model_config: ClassVar[ConfigDict]
+                x = ConfigDict(arbitrary_types_allowed=True)
+        """).lstrip()
+        assert not self._check(code)
+
+    def test_ann_assign_non_model_config_target_no_violation(self):
+        code = dedent("""
+            class Model(BaseModel):
+                other: ClassVar[ConfigDict] = ConfigDict(arbitrary_types_allowed=True)
+        """).lstrip()
+        assert not self._check(code)
+
     def test_ignore_comment_suppresses_violation(self):
         code = dedent("""
             class Model(BaseModel):
