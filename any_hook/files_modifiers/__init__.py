@@ -14,6 +14,9 @@ from any_hook.files_modifiers.combine_with import CombineWith
 from any_hook.files_modifiers.comment_detector import CommentDetector
 from any_hook.files_modifiers.field_validator_check import FieldValidatorCheck
 from any_hook.files_modifiers.forbidden_functions import ForbiddenFunctions
+from any_hook.files_modifiers.instance_of_pydantic_model_detector import (
+    InstanceOfPydanticModelDetector,
+)
 from any_hook.files_modifiers.len_as_bool import LenAsBool
 from any_hook.files_modifiers.local_imports import LocalImports
 from any_hook.files_modifiers.local_imports_to_top import LocalImportsToTop
@@ -59,6 +62,7 @@ _modifier_types: list[type] = [
     CommentDetector,
     PrivateImportDetector,
     ArbitraryTypesAllowedCheck,
+    InstanceOfPydanticModelDetector,
 ]
 __all__ = [
     "Modifier",
@@ -84,6 +88,7 @@ __all__ = [
     "CommentDetector",
     "PrivateImportDetector",
     "ArbitraryTypesAllowedCheck",
+    "InstanceOfPydanticModelDetector",
     "AnyModifier",
 ]
 try:
@@ -133,6 +138,7 @@ if TYPE_CHECKING:
             CommentDetector,
             PrivateImportDetector,
             ArbitraryTypesAllowedCheck,
+            InstanceOfPydanticModelDetector,
             WorkflowEnvToExample,
             GenerateStubs,
         ],

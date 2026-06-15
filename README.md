@@ -781,6 +781,36 @@ from pkg._internal import _helper   # not flagged (inside pkg/)
 from . import _internal              # not flagged (relative import)
 ```
 
+### instance-of-pydantic-model-detector
+
+Detects unneeded `InstanceOf[Model]` usages where `Model` is already a Pydantic `BaseModel` subclass.
+
+**What it does:**
+- Flags `InstanceOf[Model]`, aliased imports (`from pydantic import InstanceOf as IO`), and attribute access (`pydantic.InstanceOf[Model]`) when `Model` is a `BaseModel` subclass
+- Resolves `Model` across files: classes defined in the same file, imported from other project files, or imported from installed packages (following the import chain, including re-exports of `pydantic.BaseModel` itself)
+- Skips silently when `Model` cannot be resolved (e.g. genuinely external, non-Pydantic types) or is not a `BaseModel` subclass
+- Allows usages suppressed with `# ignore`
+
+**Configuration:**
+- `source_roots`: tuple of source root directories used to resolve imported modules to files (default: `(".",)`)
+
+**Example:**
+```python
+from pydantic import BaseModel, InstanceOf
+
+class Model(BaseModel):
+    pass
+
+class Container(BaseModel):
+    model: InstanceOf[Model]  # flagged - InstanceOf is unneeded, Model is already a Pydantic model
+
+class ExternalType:
+    pass
+
+class OtherContainer(BaseModel):
+    value: InstanceOf[ExternalType]  # not flagged - ExternalType is not a Pydantic model
+```
+
 ### workflow-env-to-example
 
 Extracts environment variables from GitHub Actions workflow files and generates `.env.example`.
