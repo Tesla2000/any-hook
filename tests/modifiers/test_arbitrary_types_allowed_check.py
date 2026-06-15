@@ -107,6 +107,3 @@ class TestArbitraryTypesAllowedCheck(TransformerTestCase):
             path=Path("test.py"), content=code, module=parse_module(code)
         )
         return ArbitraryTypesAllowedCheck().modify([file_data])
-
-    def _create_transformer(self):
-        raise NotImplementedError
