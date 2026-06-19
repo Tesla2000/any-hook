@@ -4,15 +4,19 @@
     "dockerfile": "Dockerfile",
     "context": ".."
   },
-  "features": {
-    "ghcr.io/devcontainers/features/node:1": {
-      "version": "lts"
-    }
-  },
   "workspaceFolder": "/workspace",
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
   "mounts": [
-    "source=claude-config,target=/root/.claude,type=volume"
+    {
+      "source": "claude-config",
+      "target": "/root/.claude",
+      "type": "volume"
+    },
+    {
+      "source": "${localEnv:SSH_AUTH_SOCK}",
+      "target": "/ssh-agent",
+      "type": "bind"
+    }
   ],
   "postCreateCommand": "bash .devcontainer/post-create.sh",
   "customizations": {
@@ -29,6 +33,7 @@
     }
   },
   "containerEnv": {
-    "IS_SANDBOX": "1"
+    "IS_SANDBOX": "1",
+    "SSH_AUTH_SOCK": "/ssh-agent"
   }
 }

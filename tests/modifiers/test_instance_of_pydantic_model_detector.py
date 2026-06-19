@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 from textwrap import dedent
 
@@ -7,6 +8,7 @@ from any_hook import FileData
 from any_hook.files_modifiers.instance_of_pydantic_model_detector import (
     InstanceOfPydanticModelDetector,
 )
+from tests.modifiers._base import RecordingOutput
 
 
 class TestInstanceOfPydanticModelDetector:
@@ -191,6 +193,26 @@ class TestInstanceOfPydanticModelDetector:
                 model: InstanceOf[42]
         """).lstrip()
         assert not self._check_code(code)
+
+    def test_output_includes_line_number(self):
+        code = dedent("""
+            from pydantic import BaseModel, InstanceOf
+            class Model(BaseModel):
+                pass
+            class Container(BaseModel):
+                model: InstanceOf[Model]
+        """).lstrip()
+        recorder = RecordingOutput()
+        file_data = FileData(
+            path=Path("test.py"), content=code, module=parse_module(code)
+        )
+        InstanceOfPydanticModelDetector(outputs=(recorder,)).modify(
+            [file_data]
+        )
+        assert re.match(
+            r"test\.py:\d+: InstanceOf\[Model\] is unneeded",
+            recorder.messages[0],
+        )
 
     def _check_code(self, code: str) -> bool:
         file_data = FileData(

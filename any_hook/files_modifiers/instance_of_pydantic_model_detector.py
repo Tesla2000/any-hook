@@ -16,6 +16,7 @@ from libcst import (
     SimpleStatementLine,
     Subscript,
 )
+from libcst.metadata import MetadataWrapper, PositionProvider
 from pydantic import Field
 
 from any_hook._file_data import FileData
@@ -33,6 +34,8 @@ def _dotted_name(node: Name | Attribute) -> str:
 
 
 class _InstanceOfVisitor(CSTVisitor):
+    METADATA_DEPENDENCIES = (PositionProvider,)
+
     def __init__(
         self,
         file_data: FileData,
@@ -46,7 +49,7 @@ class _InstanceOfVisitor(CSTVisitor):
         self._tracker = ImportPathTracker(source_roots, extra_sys_path)
         self._instance_of_names: set[str] = set()
         self._pydantic_module_names: set[str] = set()
-        self.violations: list[str] = []
+        self.violations: list[tuple[str, int]] = []
 
     def visit_ImportFrom(self, node: ImportFrom) -> bool:
         if node.module is None or isinstance(node.names, ImportStar):
@@ -85,7 +88,8 @@ class _InstanceOfVisitor(CSTVisitor):
         if self._has_ignore_comment(node):
             return True
         if self._is_pydantic_model(class_name):
-            self.violations.append(class_name)
+            line_num = self.get_metadata(PositionProvider, node).start.line
+            self.violations.append((class_name, line_num))
         return True
 
     def _is_instance_of(self, node: object) -> bool:
@@ -190,12 +194,12 @@ class InstanceOfPydanticModelDetector(Modifier):
         visitor = _InstanceOfVisitor(
             file_data, compiled_pattern, self.source_roots, self.extra_sys_path
         )
-        file_data.module.visit(visitor)
+        MetadataWrapper(file_data.module).visit(visitor)
         if not visitor.violations:
             return False
-        for class_name in visitor.violations:
+        for class_name, line_num in visitor.violations:
             self._output(
-                f"{file_data.path}: InstanceOf[{class_name}] is unneeded - "
+                f"{file_data.path}:{line_num}: InstanceOf[{class_name}] is unneeded - "
                 f"{class_name} is already a Pydantic model"
             )
         return True
