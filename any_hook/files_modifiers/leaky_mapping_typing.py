@@ -24,7 +24,9 @@ from any_hook._file_data import FileData
 from any_hook.files_modifiers._base import Modifier
 
 _STATIC_LEAKY_VALUES: frozenset[str] = frozenset({"object", "Any"})
-_STATIC_MAPPING_NAMES: frozenset[str] = frozenset({"Mapping", "MutableMapping"})
+_STATIC_MAPPING_NAMES: frozenset[str] = frozenset(
+    {"Mapping", "MutableMapping"}
+)
 _STATIC_DICT_NAMES: frozenset[str] = frozenset({"dict", "Dict"})
 _TRACKED_MODULES: frozenset[str] = frozenset(
     {"typing", "collections.abc", "typing_extensions"}
@@ -55,7 +57,9 @@ def _contains_leaky_type(
             slice_elems = [
                 e for e in node.slice if isinstance(e, SubscriptElement)
             ]
-            if len(slice_elems) == 2 and isinstance(slice_elems[1].slice, Index):
+            if len(slice_elems) == 2 and isinstance(
+                slice_elems[1].slice, Index
+            ):
                 if _get_base_name(slice_elems[1].slice.value) in leaky_values:
                     return True
         return any(
