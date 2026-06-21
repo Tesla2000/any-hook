@@ -19,6 +19,7 @@ from libcst import (
     SubscriptElement,
 )
 from libcst.helpers import get_absolute_module_for_import
+from libcst.metadata import MetadataWrapper, PositionProvider
 
 from any_hook._file_data import FileData
 from any_hook.files_modifiers._base import Modifier
@@ -79,6 +80,8 @@ def _contains_leaky_type(
 
 
 class _LeakyMappingTypingVisitor(CSTVisitor):
+    METADATA_DEPENDENCIES = (PositionProvider,)
+
     def __init__(
         self,
         content: str,
@@ -92,7 +95,7 @@ class _LeakyMappingTypingVisitor(CSTVisitor):
         self._leaky_values: set[str] = set(_STATIC_LEAKY_VALUES)
         self._mapping_names: set[str] = set(_STATIC_MAPPING_NAMES)
         self._dict_names: set[str] = set(_STATIC_DICT_NAMES)
-        self.violations: list[str] = []
+        self.violations: list[tuple[str, int]] = []
 
     def visit_ImportFrom(self, node: ImportFrom) -> bool:
         module_name = get_absolute_module_for_import(None, node)
@@ -144,7 +147,8 @@ class _LeakyMappingTypingVisitor(CSTVisitor):
         annotation_text = self._module.code_for_node(node)
         if self._has_ignore_comment(annotation_text):
             return
-        self.violations.append(annotation_text)
+        line_num = self.get_metadata(PositionProvider, node).start.line
+        self.violations.append((annotation_text, line_num))
 
     def _has_ignore_comment(self, annotation_text: str) -> bool:
         for line in self._content.splitlines():
@@ -199,11 +203,11 @@ class LeakyMappingTyping(Modifier):
         visitor = _LeakyMappingTypingVisitor(
             file_data.content, file_data.module, compiled_pattern
         )
-        file_data.module.visit(visitor)
+        MetadataWrapper(file_data.module).visit(visitor)
         if visitor.violations:
-            for annotation_text in visitor.violations:
+            for annotation_text, line_num in visitor.violations:
                 self._output(
-                    f"{file_data.path}: leaky type hint detected: {annotation_text}"
+                    f"{file_data.path}:{line_num}: leaky type hint detected: {annotation_text}"
                 )
             return True
         return False

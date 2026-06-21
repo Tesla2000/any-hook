@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 from pathlib import Path as PathlibPath
 from tempfile import TemporaryDirectory
@@ -9,7 +10,7 @@ from any_hook import FileData
 from any_hook.files_modifiers.private_import_detector import (
     PrivateImportDetector,
 )
-from tests.modifiers._base import TransformerTestCase
+from tests.modifiers._base import RecordingOutput, TransformerTestCase
 
 
 class TestPrivateImportDetector(TransformerTestCase):
@@ -261,6 +262,20 @@ class TestPrivateImportDetector(TransformerTestCase):
             path=path, content=code, module=parse_module(code)
         )
         return modifier.modify([file_data])
+
+    def test_output_includes_line_number(self):
+        code = "from any_hook._file_data import FileData\n"
+        recorder = RecordingOutput()
+        file_data = FileData(
+            path=Path("some/other/module.py"),
+            content=code,
+            module=parse_module(code),
+        )
+        PrivateImportDetector(outputs=(recorder,)).modify([file_data])
+        assert re.match(
+            r"some/other/module\.py:\d+: Private import from outside directory:",
+            recorder.messages[0],
+        )
 
     def _create_transformer(self):
         raise NotImplementedError

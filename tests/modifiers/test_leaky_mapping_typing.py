@@ -13,7 +13,7 @@ from any_hook.files_modifiers.leaky_mapping_typing import (
     LeakyMappingTyping,
     _LeakyMappingTypingVisitor,
 )
-from tests.modifiers._base import TransformerTestCase
+from tests.modifiers._base import RecordingOutput, TransformerTestCase
 
 
 class TestLeakyMappingTyping(TransformerTestCase):
@@ -24,6 +24,17 @@ class TestLeakyMappingTyping(TransformerTestCase):
 
     def _check_code(self, code: str) -> bool:
         return LeakyMappingTyping().modify([self._make_file_data(code)])
+
+    def test_output_includes_line_number(self):
+        code = "def f(x: Mapping[str, int]) -> None: ...\n"
+        recorder = RecordingOutput()
+        file_data = FileData(
+            path=Path("test.py"), content=code, module=parse_module(code)
+        )
+        LeakyMappingTyping(outputs=(recorder,)).modify([file_data])
+        assert re.match(
+            r"test\.py:\d+: leaky type hint detected:", recorder.messages[0]
+        )
 
     def _create_transformer(self):
         raise NotImplementedError
