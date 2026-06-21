@@ -1,16 +1,16 @@
 import re
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable
 from typing import Literal
 
 from libcst import (
     AnnAssign,
     Assign,
-    AssignTarget,
     BaseExpression,
     Call,
     CSTVisitor,
     Name,
 )
+from libcst.metadata import MetadataWrapper, PositionProvider
 from pydantic import ConfigDict
 
 from any_hook._file_data import FileData
@@ -20,14 +20,22 @@ _ARBITRARY_TYPES_ALLOWED = "arbitrary_types_allowed"
 
 
 class _ArbitraryTypesAllowedVisitor(CSTVisitor):
+    METADATA_DEPENDENCIES = (PositionProvider,)
+
     def __init__(self, content: str, ignore_pattern: re.Pattern[str]) -> None:
         super().__init__()
         self._content = content
         self._ignore_pattern = ignore_pattern
-        self.violations: list[str] = []
+        self.violations: list[int] = []
 
     def visit_Assign(self, node: Assign) -> bool:
-        self._check_assignment(node.targets, node.value)
+        if any(
+            isinstance(target.target, Name)
+            and target.target.value == "model_config"
+            for target in node.targets
+        ):
+            line_num = self.get_metadata(PositionProvider, node).start.line
+            self._check_value(node.value, line_num)
         return True
 
     def visit_AnnAssign(self, node: AnnAssign) -> bool:
@@ -37,26 +45,16 @@ class _ArbitraryTypesAllowedVisitor(CSTVisitor):
             isinstance(node.target, Name)
             and node.target.value == "model_config"
         ):
-            self._check_value(node.value)
+            line_num = self.get_metadata(PositionProvider, node).start.line
+            self._check_value(node.value, line_num)
         return True
 
-    def _check_assignment(
-        self, targets: Sequence[AssignTarget], value: BaseExpression
-    ) -> None:
-        if not any(
-            isinstance(target.target, Name)
-            and target.target.value == "model_config"
-            for target in targets
-        ):
-            return
-        self._check_value(value)
-
-    def _check_value(self, value: BaseExpression) -> None:
+    def _check_value(self, value: BaseExpression, line_num: int) -> None:
         if not self._has_arbitrary_types_allowed_true(value):
             return
         if self._is_ignored():
             return
-        self.violations.append("model_config")
+        self.violations.append(line_num)
 
     @staticmethod
     def _has_arbitrary_types_allowed_true(value: BaseExpression) -> bool:
@@ -127,12 +125,12 @@ class ArbitraryTypesAllowedCheck(Modifier):
             return False
         compiled = re.compile(self.ignore_pattern, re.IGNORECASE)
         visitor = _ArbitraryTypesAllowedVisitor(file_data.content, compiled)
-        file_data.module.visit(visitor)
+        MetadataWrapper(file_data.module).visit(visitor)
         if not visitor.violations:
             return False
-        for _ in visitor.violations:
+        for line_num in visitor.violations:
             self._output(
-                f"{file_data.path}: arbitrary_types_allowed=True detected in "
+                f"{file_data.path}:{line_num}: arbitrary_types_allowed=True detected in "
                 "model_config; use InstanceOf instead"
             )
         return True

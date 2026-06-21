@@ -3,6 +3,7 @@ from collections.abc import Iterable
 from typing import Literal
 
 from libcst import Call, CSTVisitor, Expr, Module, Name, SimpleStatementLine
+from libcst.metadata import MetadataWrapper, PositionProvider
 from pydantic import Field
 
 from any_hook._file_data import FileData
@@ -10,6 +11,8 @@ from any_hook.files_modifiers._base import Modifier
 
 
 class _ForbiddenFunctionsVisitor(CSTVisitor):
+    METADATA_DEPENDENCIES = (PositionProvider,)
+
     def __init__(
         self,
         content: str,
@@ -20,7 +23,7 @@ class _ForbiddenFunctionsVisitor(CSTVisitor):
         self._content = content
         self._ignore_pattern = ignore_pattern
         self._forbidden_functions = forbidden_functions
-        self.violations: list[tuple[str, str]] = []
+        self.violations: list[tuple[str, str, int]] = []
 
     def visit_Call(self, node: Call) -> bool:
         if (
@@ -29,7 +32,8 @@ class _ForbiddenFunctionsVisitor(CSTVisitor):
         ):
             if not self._has_ignore_comment(node):
                 call_text = self._format_call(node)
-                self.violations.append((node.func.value, call_text))
+                line_num = self.get_metadata(PositionProvider, node).start.line
+                self.violations.append((node.func.value, call_text, line_num))
         return True
 
     def _has_ignore_comment(self, node: Call) -> bool:
@@ -103,11 +107,11 @@ class ForbiddenFunctions(Modifier):
         visitor = _ForbiddenFunctionsVisitor(
             file_data.content, compiled_pattern, self.forbidden_functions
         )
-        file_data.module.visit(visitor)
+        MetadataWrapper(file_data.module).visit(visitor)
         if visitor.violations:
-            for func_name, call_text in visitor.violations:
+            for func_name, call_text, line_num in visitor.violations:
                 self._output(
-                    f"{file_data.path}: {func_name} usage detected: {call_text}"
+                    f"{file_data.path}:{line_num}: {func_name} usage detected: {call_text}"
                 )
             return True
         return False

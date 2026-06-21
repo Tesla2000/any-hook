@@ -11,18 +11,21 @@ from libcst import (
     Module,
     SimpleStatementLine,
 )
+from libcst.metadata import MetadataWrapper, PositionProvider
 
 from any_hook._file_data import FileData
 from any_hook.files_modifiers._base import Modifier
 
 
 class _LocalImportVisitor(CSTVisitor):
+    METADATA_DEPENDENCIES = (PositionProvider,)
+
     def __init__(self, content: str, ignore_pattern: re.Pattern[str]) -> None:
         super().__init__()
         self._content = content
         self._ignore_pattern = ignore_pattern
         self._depth = 0
-        self.violations: list[str] = []
+        self.violations: list[tuple[str, int]] = []
 
     def visit_FunctionDef(self, node: FunctionDef) -> bool:
         self._depth += 1
@@ -41,13 +44,15 @@ class _LocalImportVisitor(CSTVisitor):
     def visit_Import(self, node: Import) -> bool:
         if self._depth > 0 and not self._has_ignore_comment(node):
             import_text = self._format_import(node)
-            self.violations.append(import_text)
+            line_num = self.get_metadata(PositionProvider, node).start.line
+            self.violations.append((import_text, line_num))
         return True
 
     def visit_ImportFrom(self, node: ImportFrom) -> bool:
         if self._depth > 0 and not self._has_ignore_comment(node):
             import_text = self._format_import_from(node)
-            self.violations.append(import_text)
+            line_num = self.get_metadata(PositionProvider, node).start.line
+            self.violations.append((import_text, line_num))
         return True
 
     def _has_ignore_comment(self, node: Import | ImportFrom) -> bool:
@@ -111,11 +116,11 @@ class LocalImports(Modifier):
             return False
         compiled_pattern = re.compile(self.ignore_pattern, re.IGNORECASE)
         visitor = _LocalImportVisitor(file_data.content, compiled_pattern)
-        file_data.module.visit(visitor)
+        MetadataWrapper(file_data.module).visit(visitor)
         if visitor.violations:
-            for import_text in visitor.violations:
+            for import_text, line_num in visitor.violations:
                 self._output(
-                    f"{file_data.path}: Local import detected: {import_text}"
+                    f"{file_data.path}:{line_num}: Local import detected: {import_text}"
                 )
             return True
         return False

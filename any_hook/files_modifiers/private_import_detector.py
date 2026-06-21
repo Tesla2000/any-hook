@@ -13,6 +13,7 @@ from libcst import (
     Name,
     SimpleStatementLine,
 )
+from libcst.metadata import MetadataWrapper, PositionProvider
 from pydantic import Field
 
 if TYPE_CHECKING:
@@ -62,6 +63,8 @@ def _file_package(path: Path) -> str:
 
 
 class _PrivateImportVisitor(CSTVisitor):
+    METADATA_DEPENDENCIES = (PositionProvider,)
+
     def __init__(
         self,
         file_package: str,
@@ -72,7 +75,7 @@ class _PrivateImportVisitor(CSTVisitor):
         self._file_package = file_package
         self._content = content
         self._ignore_pattern = ignore_pattern
-        self.violations: list[str] = []
+        self.violations: list[tuple[str, int]] = []
 
     def visit_ImportFrom(self, node: ImportFrom) -> bool:
         if node.relative or node.module is None:
@@ -82,7 +85,8 @@ class _PrivateImportVisitor(CSTVisitor):
             if not self._is_sibling(
                 module_str
             ) and not self._has_ignore_comment(node):
-                self.violations.append(self._format(node))
+                line_num = self.get_metadata(PositionProvider, node).start.line
+                self.violations.append((self._format(node), line_num))
         elif not isinstance(node.names, ImportStar):
             for alias in node.names:
                 if _is_private(alias.name.value):
@@ -94,7 +98,10 @@ class _PrivateImportVisitor(CSTVisitor):
                     if not _is_allowed(
                         self._file_package, parent
                     ) and not self._has_ignore_comment(node):
-                        self.violations.append(self._format(node))
+                        line_num = self.get_metadata(
+                            PositionProvider, node
+                        ).start.line
+                        self.violations.append((self._format(node), line_num))
                         break
         return True
 
@@ -105,7 +112,10 @@ class _PrivateImportVisitor(CSTVisitor):
                 module_str
             ):
                 if not self._has_ignore_comment(node):
-                    self.violations.append(self._format(node))
+                    line_num = self.get_metadata(
+                        PositionProvider, node
+                    ).start.line
+                    self.violations.append((self._format(node), line_num))
                 break
         return True
 
@@ -148,11 +158,11 @@ class PrivateImportDetector(Modifier):
         visitor = _PrivateImportVisitor(
             pkg, file_data.content, compiled_pattern
         )
-        file_data.module.visit(visitor)
+        MetadataWrapper(file_data.module).visit(visitor)
         if visitor.violations:
-            for import_text in visitor.violations:
+            for import_text, line_num in visitor.violations:
                 self._output(
-                    f"{file_data.path}: Private import from outside directory: {import_text}"
+                    f"{file_data.path}:{line_num}: Private import from outside directory: {import_text}"
                 )
             return True
         return False

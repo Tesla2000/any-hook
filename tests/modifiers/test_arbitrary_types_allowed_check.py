@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 from textwrap import dedent
 
@@ -7,7 +8,7 @@ from any_hook import FileData
 from any_hook.files_modifiers.arbitrary_types_allowed_check import (
     ArbitraryTypesAllowedCheck,
 )
-from tests.modifiers._base import TransformerTestCase
+from tests.modifiers._base import RecordingOutput, TransformerTestCase
 
 
 class TestArbitraryTypesAllowedCheck(TransformerTestCase):
@@ -121,6 +122,21 @@ class TestArbitraryTypesAllowedCheck(TransformerTestCase):
                 model_config = {"arbitrary_types_allowed": True}
         """).lstrip()
         assert not self._check(code)
+
+    def test_output_includes_line_number(self):
+        code = dedent("""
+            from pydantic import ConfigDict
+            class Model:
+                model_config = ConfigDict(arbitrary_types_allowed=True)
+        """).lstrip()
+        recorder = RecordingOutput()
+        file_data = FileData(
+            path=Path("test.py"), content=code, module=parse_module(code)
+        )
+        ArbitraryTypesAllowedCheck(outputs=(recorder,)).modify([file_data])
+        assert re.match(
+            r"test\.py:\d+: arbitrary_types_allowed", recorder.messages[0]
+        )
 
     def _check(self, code: str) -> bool:
         file_data = FileData(

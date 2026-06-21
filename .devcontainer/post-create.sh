@@ -8,9 +8,4 @@ if [ ! -f /root/.claude/settings.json ]; then
 fi
 
 uv sync --group dev
-
-for i in 1 2 3; do
-    npm install -g @anthropic-ai/claude-code && break
-    echo "npm install attempt $i failed, retrying..."
-    sleep 5
-done
+pre-commit install --overwrite --hook-type pre-commit --hook-type pre-push
