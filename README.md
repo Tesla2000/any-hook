@@ -437,6 +437,34 @@ print("temporary debug")  # ignore
 {"type": "forbidden-functions", "forbidden_functions": ["print", "eval"]}
 ```
 
+### leaky-mapping-typing
+
+Detects leaky `dict`/`Mapping`/`MutableMapping` type hints in function signatures.
+
+**What it does:**
+- Reports `dict[str, object]` and `dict[str, Any]` (and `Dict[str, ...]` equivalents) in parameter or return annotations, including aliased imports (`from typing import Any as A`)
+- Reports `Mapping[...]` and `MutableMapping[...]` with any type arguments, bare or qualified (`typing.Mapping`, `collections.abc.MutableMapping`)
+- Only checks function/method signature annotations — variable annotations are not flagged
+
+**Example:**
+```python
+# Flagged
+def get_user() -> dict[str, Any]: ...
+def process(data: Mapping[str, int]) -> None: ...
+
+# Allowed
+def get_user() -> User: ...
+def items() -> dict[str, int]: ...
+
+# Suppressed
+def legacy() -> dict[str, Any]: ...  # ignore
+```
+
+**Configuration:**
+```json
+{"type": "leaky-mapping-typing"}
+```
+
 ### field-validator-check
 
 Detects misused Pydantic `@field_validator` decorators.

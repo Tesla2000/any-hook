@@ -14,6 +14,7 @@ from any_hook.files_modifiers.combine_with import CombineWith
 from any_hook.files_modifiers.comment_detector import CommentDetector
 from any_hook.files_modifiers.field_validator_check import FieldValidatorCheck
 from any_hook.files_modifiers.forbidden_functions import ForbiddenFunctions
+from any_hook.files_modifiers.leaky_mapping_typing import LeakyMappingTyping
 from any_hook.files_modifiers.len_as_bool import LenAsBool
 from any_hook.files_modifiers.local_imports import LocalImports
 from any_hook.files_modifiers.local_imports_to_top import LocalImportsToTop
@@ -45,6 +46,7 @@ _modifier_types: list[type] = [
     LocalImports,
     LocalImportsToTop,
     ForbiddenFunctions,
+    LeakyMappingTyping,
     FieldValidatorCheck,
     UtcNowToDatetimeNow,
     LenAsBool,
@@ -72,6 +74,7 @@ __all__ = [
     "LocalImports",
     "LocalImportsToTop",
     "ForbiddenFunctions",
+    "LeakyMappingTyping",
     "FieldValidatorCheck",
     "UtcNowToDatetimeNow",
     "LenAsBool",
@@ -119,6 +122,7 @@ if TYPE_CHECKING:
             LocalImports,
             LocalImportsToTop,
             ForbiddenFunctions,
+            LeakyMappingTyping,
             FieldValidatorCheck,
             UtcNowToDatetimeNow,
             LenAsBool,
