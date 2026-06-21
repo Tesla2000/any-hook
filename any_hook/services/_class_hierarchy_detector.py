@@ -1,6 +1,19 @@
 from libcst import Attribute, BaseExpression, ClassDef, Name
 
 
+def _extract_base_name(base_value: BaseExpression) -> str | None:
+    """Extract class name from a base expression (Name or nested Attribute).
+
+    For Attributes, extracts the final name (e.g., 'BaseModel' from 'a.b.BaseModel').
+    Returns None for invalid base expressions (Call, Lambda, etc).
+    """
+    if isinstance(base_value, Name):
+        return base_value.value
+    if isinstance(base_value, Attribute):
+        return base_value.attr.value
+    return None
+
+
 class _ClassHierarchyDetector:
     """Recursively detects if a class is a subclass of target base classes.
 
@@ -31,26 +44,13 @@ class _ClassHierarchyDetector:
             visited = set()
 
         for base in node.bases:
-            base_class_name = self._extract_base_name(base.value)
+            base_class_name = _extract_base_name(base.value)
             if base_class_name is None:
                 continue
             if self._check_base(base_class_name, target_bases, visited):
                 return True
 
         return False
-
-    @staticmethod
-    def _extract_base_name(base_value: BaseExpression) -> str | None:
-        """Extract class name from a base expression (Name or nested Attribute).
-
-        For Attributes, extracts the final name (e.g., 'BaseModel' from 'a.b.BaseModel').
-        Returns None for invalid base expressions (Call, Lambda, etc).
-        """
-        if isinstance(base_value, Name):
-            return base_value.value
-        if isinstance(base_value, Attribute):
-            return base_value.attr.value
-        return None
 
     def _check_base(
         self, base_class_name: str, target_bases: set[str], visited: set[str]
