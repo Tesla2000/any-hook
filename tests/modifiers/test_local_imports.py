@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from textwrap import dedent
@@ -6,7 +7,7 @@ from libcst import parse_module
 
 from any_hook import FileData
 from any_hook.files_modifiers.local_imports import LocalImports
-from tests.modifiers._base import TransformerTestCase
+from tests.modifiers._base import RecordingOutput, TransformerTestCase
 
 
 class TestLocalImports(TransformerTestCase):
@@ -153,6 +154,17 @@ class TestLocalImports(TransformerTestCase):
             path=Path("test.py"), content=code, module=parse_module(code)
         )
         return modifier.modify([file_data])
+
+    def test_output_includes_line_number(self):
+        code = "def foo():\n    import os\n"
+        recorder = RecordingOutput()
+        file_data = FileData(
+            path=Path("test.py"), content=code, module=parse_module(code)
+        )
+        LocalImports(outputs=(recorder,)).modify([file_data])
+        assert re.match(
+            r"test\.py:\d+: Local import detected:", recorder.messages[0]
+        )
 
     def _create_transformer(self):
         raise NotImplementedError

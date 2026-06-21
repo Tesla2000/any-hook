@@ -13,6 +13,7 @@ from libcst import (
     SimpleStatementLine,
     SimpleString,
 )
+from libcst.metadata import MetadataWrapper, PositionProvider
 from pydantic import field_validator
 from typing_extensions import TypeIs
 
@@ -42,11 +43,13 @@ class _ClsUsageVisitor(CSTVisitor):
 
 
 class _FieldValidatorVisitor(CSTVisitor):
+    METADATA_DEPENDENCIES = (PositionProvider,)
+
     def __init__(self, content: str, ignore_pattern: re.Pattern[str]) -> None:
         super().__init__()
         self._content = content
         self._ignore_pattern = ignore_pattern
-        self.violations: list[str] = []
+        self.violations: list[tuple[str, int]] = []
 
     def visit_FunctionDef(self, node: FunctionDef) -> bool:
         decorator = self._find_field_validator_decorator(node)
@@ -57,9 +60,13 @@ class _FieldValidatorVisitor(CSTVisitor):
         field_names = self._extract_field_names(decorator)
         cls_used = self._is_cls_used(node)
         if not cls_used and "*" not in field_names:
+            line_num = self.get_metadata(PositionProvider, node).start.line
             self.violations.append(
-                f"{node.name.value}({', '.join(repr(f) for f in field_names)}): "
-                "cls is not used or '*' is not among validated fields"
+                (
+                    f"{node.name.value}({', '.join(repr(f) for f in field_names)}): "
+                    "cls is not used or '*' is not among validated fields",
+                    line_num,
+                )
             )
         return True
 
@@ -166,9 +173,11 @@ class FieldValidatorCheck(Modifier):
             return False
         compiled = re.compile(self.ignore_pattern, re.IGNORECASE)
         visitor = _FieldValidatorVisitor(file_data.content, compiled)
-        file_data.module.visit(visitor)
+        MetadataWrapper(file_data.module).visit(visitor)
         if not visitor.violations:
             return False
-        for violation in visitor.violations:
-            self._output(f"{file_data.path}: field_validator {violation}")
+        for violation, line_num in visitor.violations:
+            self._output(
+                f"{file_data.path}:{line_num}: field_validator {violation}"
+            )
         return True

@@ -1,5 +1,9 @@
 from libcst import CSTTransformer, parse_module
 
+from any_hook.files_modifiers.output.recording import RecordingOutput
+
+__all__ = ["RecordingOutput", "TransformerTestCase"]
+
 
 class TransformerTestCase:
     def _create_transformer(self) -> CSTTransformer:
