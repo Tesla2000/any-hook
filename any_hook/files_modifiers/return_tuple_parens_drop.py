@@ -21,8 +21,10 @@ class _ReturnTupleParensDropTransformer(IgnoreAwareTransformer):
     def __init__(self, ignore_pattern: re.Pattern[str]) -> None:
         super().__init__(ignore_pattern)
 
-    def leave_Return(self, _: Return, updated_node: Return) -> Return:
-        if self._is_currently_ignored():
+    def leave_Return(
+        self, original_node: Return, updated_node: Return
+    ) -> Return:
+        if self._is_ignored(original_node):
             return updated_node
         value = updated_node.value
         if not isinstance(value, Tuple):

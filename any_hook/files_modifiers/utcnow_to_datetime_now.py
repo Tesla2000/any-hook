@@ -54,12 +54,12 @@ class _UtcNowTransformer(IgnoreAwareTransformer):
             self._in_utcnow_call = True
         return True
 
-    def leave_Call(self, _: Call, updated_node: Call) -> Call:
+    def leave_Call(self, original_node: Call, updated_node: Call) -> Call:
         is_class_utcnow = self._is_class_utcnow(updated_node.func)
         is_module_utcnow = self._is_module_utcnow(updated_node.func)
         if is_class_utcnow or is_module_utcnow:
             self._in_utcnow_call = False
-        if self._is_currently_ignored():
+        if self._is_ignored(original_node):
             return updated_node
         if is_class_utcnow:
             self._needs_utc_import = True
@@ -86,11 +86,11 @@ class _UtcNowTransformer(IgnoreAwareTransformer):
         return updated_node
 
     def leave_Attribute(
-        self, _: Attribute, updated_node: Attribute
+        self, original_node: Attribute, updated_node: Attribute
     ) -> BaseExpression:
         if self._in_utcnow_call:
             return updated_node
-        if self._is_currently_ignored():
+        if self._is_ignored(original_node):
             return updated_node
         if self._is_class_utcnow(updated_node):
             self._needs_utc_import = True

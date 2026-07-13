@@ -17,9 +17,9 @@ from any_hook.files_modifiers.separate_modifier import SeparateModifier
 
 class _RemoveFPrefixTransformer(IgnoreAwareTransformer):
     def leave_FormattedString(
-        self, _: FormattedString, updated_node: FormattedString
+        self, original_node: FormattedString, updated_node: FormattedString
     ) -> Union[FormattedString, SimpleString]:
-        if self._is_currently_ignored():
+        if self._is_ignored(original_node):
             return updated_node
         if any(
             isinstance(part, FormattedStringExpression)

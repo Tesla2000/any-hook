@@ -94,7 +94,7 @@ class _LocalImportsToTopTransformer(IgnoreAwareTransformer):
         original_node: SimpleStatementLine,
         updated_node: SimpleStatementLine,
     ) -> SimpleStatementLine | RemovalSentinel:
-        if self._depth == 0 or self._is_currently_ignored():
+        if self._depth == 0 or self._is_ignored(original_node):
             return updated_node
         stmt = updated_node.body[0]
         if not isinstance(stmt, (Import, ImportFrom)):

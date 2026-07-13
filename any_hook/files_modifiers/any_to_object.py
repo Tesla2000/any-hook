@@ -65,12 +65,12 @@ class _AnyToObjectTransformer(IgnoreAwareTransformer):
         self._in_attribute = False
         return updated_node
 
-    def leave_Name(self, _: Name, updated_node: Name) -> Name:
+    def leave_Name(self, original_node: Name, updated_node: Name) -> Name:
         if (
             (self._in_annotation or self._in_subscript > 0)
             and updated_node.value == Any.__name__
             and not self._in_attribute
-            and not self._is_currently_ignored()
+            and not self._is_ignored(original_node)
         ):
             self._made_changes = True
             return Name(object.__name__)

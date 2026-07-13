@@ -144,6 +144,22 @@ class TestAgitoGlobalModifiers:
             )
             assert not agito.modify([file_data])
 
+    def test_excluded_lines_applies_to_fused_transformer(self):
+        with TemporaryDirectory() as tmpdir:
+            test_file = Path(tmpdir) / "test.py"
+            code = "a = bool(len(x))\nb = bool(len(y))\n"
+            test_file.write_text(code)
+            agito = Agito(
+                modifiers=(LenAsBool(excluded_lines=(f"{test_file}:1",)),),
+            )
+            file_data = FileData(
+                path=test_file,
+                content=code,
+                module=parse_module(code),
+            )
+            assert agito.modify([file_data])
+            assert test_file.read_text() == "a = bool(len(x))\nb = bool(y)\n"
+
     def test_combination_with_local_imports_and_local_imports_to_top(self):
         with TemporaryDirectory() as tmpdir:
             test_file = Path(tmpdir) / "test.py"
