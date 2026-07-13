@@ -121,6 +121,28 @@ def foo(x: object) -> list[object]:
     return [x]
 ```
 
+### mark-any
+
+Detects and reports usages of `Any` in type annotations, without modifying files.
+
+**What it does:**
+- Scans for `Any` used as (or within) a type annotation, e.g. `list[Any]`, `dict[str, Any]`, `Union[Any, str]`
+- Reports violations with file path and line number
+- Leaves `typing.Any` attribute access and non-annotation uses of `Any` unflagged
+- Respects `# ignore` comments to suppress specific warnings
+- Returns non-zero exit code if violations are found
+
+**Example:**
+```python
+# This will be flagged
+def foo(x: Any) -> list[Any]:
+    return [x]
+
+# This will be ignored
+def bar(x: Any) -> Any:  # ignore
+    return x
+```
+
 ### object-to-any
 
 Transforms `object` type hints to `Any` for better type checking compatibility.
