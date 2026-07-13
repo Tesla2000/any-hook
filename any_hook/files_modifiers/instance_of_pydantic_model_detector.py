@@ -195,9 +195,14 @@ class InstanceOfPydanticModelDetector(Modifier):
             file_data, compiled_pattern, self.source_roots, self.extra_sys_path
         )
         MetadataWrapper(file_data.module).visit(visitor)
-        if not visitor.violations:
+        violations = [
+            (class_name, line_num)
+            for class_name, line_num in visitor.violations
+            if self.should_process_line(file_data.path, line_num)
+        ]
+        if not violations:
             return False
-        for class_name, line_num in visitor.violations:
+        for class_name, line_num in violations:
             self._output(
                 f"{file_data.path}:{line_num}: InstanceOf[{class_name}] is unneeded - "
                 f"{class_name} is already a Pydantic model"

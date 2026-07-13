@@ -1,5 +1,7 @@
 import re
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
+from functools import partial
+from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Literal, Union
 
 from libcst import (
@@ -9,10 +11,14 @@ from libcst import (
     FlattenSentinel,
     RemovalSentinel,
 )
+from libcst.metadata import CodeRange, MetadataWrapper, PositionProvider
 from pydantic import Field
 
 from any_hook._file_data import FileData
 from any_hook.files_modifiers._base import Modifier
+from any_hook.files_modifiers._ignore_aware_transformer import (
+    IgnoreAwareTransformer,
+)
 from any_hook.files_modifiers.separate_modifier import SeparateModifier
 
 if TYPE_CHECKING:
@@ -75,17 +81,38 @@ class Agito(Modifier):
         if not self.should_process_file(file_data.path):
             return False
         compiled = re.compile(self.ignore_pattern, re.IGNORECASE)
-        transformers = tuple(
-            m.create_transformer(compiled)
-            for m in self.modifiers
-            if isinstance(m, SeparateModifier)
-            and m.should_process_file(file_data.path)
-        )
+        positions = MetadataWrapper(
+            file_data.module, unsafe_skip_copy=True
+        ).resolve(PositionProvider)
+        transformers = []
+        for m in self.modifiers:
+            if not isinstance(m, SeparateModifier):
+                continue
+            if not m.should_process_file(file_data.path):
+                continue
+            transformers.append(
+                self._build_transformer(m, file_data.path, compiled, positions)
+            )
         if not transformers:
             return False
-        new_code = file_data.module.visit(_AgitoTransformer(transformers)).code
+        new_code = file_data.module.visit(
+            _AgitoTransformer(tuple(transformers))
+        ).code
         if new_code == file_data.content:
             return False
         file_data.path.write_text(new_code)
         self._output(f"File {file_data.path} was modified")
         return True
+
+    @staticmethod
+    def _build_transformer(
+        modifier: "SeparateModifier[IgnoreAwareTransformer]",
+        path: Path,
+        ignore_pattern: re.Pattern[str],
+        positions: Mapping[CSTNode, CodeRange],
+    ) -> IgnoreAwareTransformer:
+        transformer = modifier.create_transformer(ignore_pattern)
+        transformer.configure_line_filter(
+            partial(modifier.should_process_line, path), positions
+        )
+        return transformer

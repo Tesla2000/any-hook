@@ -174,9 +174,14 @@ class FieldValidatorCheck(Modifier):
         compiled = re.compile(self.ignore_pattern, re.IGNORECASE)
         visitor = _FieldValidatorVisitor(file_data.content, compiled)
         MetadataWrapper(file_data.module).visit(visitor)
-        if not visitor.violations:
+        violations = [
+            (violation, line_num)
+            for violation, line_num in visitor.violations
+            if self.should_process_line(file_data.path, line_num)
+        ]
+        if not violations:
             return False
-        for violation, line_num in visitor.violations:
+        for violation, line_num in violations:
             self._output(
                 f"{file_data.path}:{line_num}: field_validator {violation}"
             )

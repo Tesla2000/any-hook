@@ -50,9 +50,9 @@ class _LenAsBoolTransformer(IgnoreAwareTransformer):
         return updated_node.with_changes(test=new_test)
 
     def leave_UnaryOperation(
-        self, _: UnaryOperation, updated_node: UnaryOperation
+        self, original_node: UnaryOperation, updated_node: UnaryOperation
     ) -> BaseExpression:
-        if self._is_currently_ignored():
+        if self._is_ignored(original_node):
             return updated_node
         if not isinstance(updated_node.operator, Not):
             return updated_node
@@ -61,8 +61,10 @@ class _LenAsBoolTransformer(IgnoreAwareTransformer):
         len_call = updated_node.expression
         return updated_node.with_changes(expression=len_call.args[0].value)
 
-    def leave_Call(self, _: Call, updated_node: Call) -> BaseExpression:
-        if self._is_currently_ignored():
+    def leave_Call(
+        self, original_node: Call, updated_node: Call
+    ) -> BaseExpression:
+        if self._is_ignored(original_node):
             return updated_node
         if not isinstance(updated_node.func, Name):
             return updated_node

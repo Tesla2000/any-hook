@@ -80,6 +80,7 @@ All modifiers share the following common options:
 |---|---|---|
 | `excluded_paths` | `[]` | Glob patterns for paths to skip (e.g. `"tests/*"`, `"*/migrations/*"`). Cannot be combined with `included_paths`. |
 | `included_paths` | `[]` | Glob patterns for paths to include. When set, only matching files are processed. Cannot be combined with `excluded_paths`. |
+| `excluded_lines` | `[]` | `"path_glob:line"` or `"path_glob:start-end"` entries for specific lines/ranges to exclude from checking (e.g. `"src/legacy.py:10-15"`), without needing an inline comment. |
 | `ignore_pattern` | `#\s*ignore` | Regex matched against inline comments to suppress a violation on that line. |
 
 **Example:**
@@ -96,6 +97,13 @@ All modifiers share the following common options:
   "forbidden_functions": ["print"],
   "included_paths": ["src/*"],
   "ignore_pattern": "#\\s*noqa"
+}
+```
+
+```json
+{
+  "type": "mark-any",
+  "excluded_lines": ["src/legacy.py:10-15", "scripts/gen.py:42"]
 }
 ```
 

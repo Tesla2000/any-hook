@@ -126,9 +126,14 @@ class ArbitraryTypesAllowedCheck(Modifier):
         compiled = re.compile(self.ignore_pattern, re.IGNORECASE)
         visitor = _ArbitraryTypesAllowedVisitor(file_data.content, compiled)
         MetadataWrapper(file_data.module).visit(visitor)
-        if not visitor.violations:
+        violations = [
+            line_num
+            for line_num in visitor.violations
+            if self.should_process_line(file_data.path, line_num)
+        ]
+        if not violations:
             return False
-        for line_num in visitor.violations:
+        for line_num in violations:
             self._output(
                 f"{file_data.path}:{line_num}: arbitrary_types_allowed=True detected in "
                 "model_config; use InstanceOf instead"
