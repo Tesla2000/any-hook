@@ -22,6 +22,7 @@ There are two main categories of modifiers:
 
   * :doc:`local_imports` - Detect import statements inside functions/classes
   * :doc:`forbidden_functions` - Detect calls to forbidden function names
+  * :doc:`mark_any` - Detect usages of ``Any`` in type annotations
   * :doc:`workflow_env_to_example` - Extract environment variables from workflows
 
 Available Modifiers
@@ -36,6 +37,7 @@ Available Modifiers
    str_enum_inheritance
    local_imports
    forbidden_functions
+   mark_any
    workflow_env_to_example
 
 Base Classes
