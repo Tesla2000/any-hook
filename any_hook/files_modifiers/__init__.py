@@ -21,6 +21,7 @@ from any_hook.files_modifiers.leaky_mapping_typing import LeakyMappingTyping
 from any_hook.files_modifiers.len_as_bool import LenAsBool
 from any_hook.files_modifiers.local_imports import LocalImports
 from any_hook.files_modifiers.local_imports_to_top import LocalImportsToTop
+from any_hook.files_modifiers.mark_any import MarkAny
 from any_hook.files_modifiers.object_to_any import ObjectToAny
 from any_hook.files_modifiers.open_to_path import OpenToPath
 from any_hook.files_modifiers.private_import_detector import (
@@ -65,6 +66,7 @@ _modifier_types: list[type] = [
     PrivateImportDetector,
     ArbitraryTypesAllowedCheck,
     InstanceOfPydanticModelDetector,
+    MarkAny,
 ]
 __all__ = [
     "Modifier",
@@ -92,6 +94,7 @@ __all__ = [
     "PrivateImportDetector",
     "ArbitraryTypesAllowedCheck",
     "InstanceOfPydanticModelDetector",
+    "MarkAny",
     "AnyModifier",
 ]
 try:
@@ -143,6 +146,7 @@ if TYPE_CHECKING:
             PrivateImportDetector,
             ArbitraryTypesAllowedCheck,
             InstanceOfPydanticModelDetector,
+            MarkAny,
             WorkflowEnvToExample,
             GenerateStubs,
         ],
