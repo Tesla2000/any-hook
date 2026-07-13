@@ -2,11 +2,22 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterable
 from functools import reduce
 from pathlib import Path
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    model_validator,
+)
 
 from any_hook._file_data import FileData
 from any_hook.files_modifiers.output import AnyOutput, StandardOutput
+
+ExcludedLineEntry = Annotated[
+    str, StringConstraints(pattern=r"^.+:\d+(-\d+)?$")
+]
 
 
 class Modifier(BaseModel, ABC):
@@ -32,11 +43,15 @@ class Modifier(BaseModel, ABC):
             >>> modifier = MyModifier(excluded_paths=("tests/*", "scripts/*"))
             >>> modifier = MyModifier(included_paths=("src/*",))
 
+        Line filtering:
+            >>> modifier = MyModifier(excluded_lines=("src/legacy.py:10-15",))
+
     Note:
         Modifiers can either transform files (like ObjectToAny) or detect
         violations (like LocalImports). The return value indicates whether
         any files were modified or violations were found.
         Use excluded_paths or included_paths (but not both) to filter files.
+        Use excluded_lines to exclude specific lines or line ranges.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -56,6 +71,10 @@ class Modifier(BaseModel, ABC):
     included_paths: tuple[str, ...] = Field(
         default=(),
         description="Tuple of glob patterns for paths to include in checking (e.g., 'src/*'). If set, only matching paths are checked.",
+    )
+    excluded_lines: tuple[ExcludedLineEntry, ...] = Field(
+        default=(),
+        description='Tuple of "path_glob:line" or "path_glob:start-end" entries for lines to exclude from checking (e.g., "src/legacy.py:10-15").',
     )
 
     @model_validator(mode="after")
@@ -77,6 +96,18 @@ class Modifier(BaseModel, ABC):
             return not any(
                 path.match(pattern) for pattern in self.excluded_paths
             )
+        return True
+
+    def should_process_line(self, path: Path, line_num: int) -> bool:
+        for entry in self.excluded_lines:
+            glob_pattern, _, line_spec = entry.rpartition(":")
+            if not path.match(glob_pattern):
+                continue
+            start_str, _, end_str = line_spec.partition("-")
+            start = int(start_str)
+            end = int(end_str) if end_str else start
+            if start <= line_num <= end:
+                return False
         return True
 
     def _output(self, text: str) -> None:

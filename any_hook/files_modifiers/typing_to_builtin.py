@@ -70,13 +70,13 @@ class _TypingToBuiltinTransformer(IgnoreAwareTransformer):
         self._in_attribute_depth -= 1
         return updated_node
 
-    def leave_Name(self, _: Name, updated_node: Name) -> Name:
+    def leave_Name(self, original_node: Name, updated_node: Name) -> Name:
         if not self._in_annotation or self._in_attribute_depth:
             return updated_node
         name = updated_node.value
         if name not in self._imported_typing_names:
             return updated_node
-        if self._is_currently_ignored():
+        if self._is_ignored(original_node):
             self._names_still_needed.add(name)
             return updated_node
         self._made_changes = True

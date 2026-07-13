@@ -108,8 +108,13 @@ class ForbiddenFunctions(Modifier):
             file_data.content, compiled_pattern, self.forbidden_functions
         )
         MetadataWrapper(file_data.module).visit(visitor)
-        if visitor.violations:
-            for func_name, call_text, line_num in visitor.violations:
+        violations = [
+            (func_name, call_text, line_num)
+            for func_name, call_text, line_num in visitor.violations
+            if self.should_process_line(file_data.path, line_num)
+        ]
+        if violations:
+            for func_name, call_text, line_num in violations:
                 self._output(
                     f"{file_data.path}:{line_num}: {func_name} usage detected: {call_text}"
                 )
