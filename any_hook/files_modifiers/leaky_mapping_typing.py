@@ -204,8 +204,13 @@ class LeakyMappingTyping(Modifier):
             file_data.content, file_data.module, compiled_pattern
         )
         MetadataWrapper(file_data.module).visit(visitor)
-        if visitor.violations:
-            for annotation_text, line_num in visitor.violations:
+        violations = [
+            (annotation_text, line_num)
+            for annotation_text, line_num in visitor.violations
+            if self.should_process_line(file_data.path, line_num)
+        ]
+        if violations:
+            for annotation_text, line_num in violations:
                 self._output(
                     f"{file_data.path}:{line_num}: leaky type hint detected: {annotation_text}"
                 )

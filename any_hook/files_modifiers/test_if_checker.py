@@ -191,8 +191,13 @@ class TestIfChecker(Modifier):
         )
         wrapper = MetadataWrapper(file_data.module)
         wrapper.visit(visitor)
-        if visitor.violations:
-            for func_name, line_num in visitor.violations:
+        violations = [
+            (func_name, line_num)
+            for func_name, line_num in visitor.violations
+            if self.should_process_line(file_data.path, line_num)
+        ]
+        if violations:
+            for func_name, line_num in violations:
                 self._output(
                     f"{file_data.path}:{line_num}: test function '{func_name}' contains conditional logic"
                 )

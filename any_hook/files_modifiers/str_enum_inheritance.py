@@ -102,11 +102,13 @@ class _StrEnumInheritanceTransformer(IgnoreAwareTransformer):
             return updated_node.with_changes(bases=new_bases)
         return updated_node
 
-    def leave_Assign(self, _: Assign, updated_node: Assign) -> Assign:
+    def leave_Assign(
+        self, original_node: Assign, updated_node: Assign
+    ) -> Assign:
         if (
             not self._convert_to_auto
             or not self._in_str_enum_class
-            or self._is_currently_ignored()
+            or self._is_ignored(original_node)
         ):
             return updated_node
         if not isinstance(updated_node.value, SimpleString):
@@ -129,12 +131,12 @@ class _StrEnumInheritanceTransformer(IgnoreAwareTransformer):
         return updated_node
 
     def leave_AnnAssign(
-        self, _: AnnAssign, updated_node: AnnAssign
+        self, original_node: AnnAssign, updated_node: AnnAssign
     ) -> AnnAssign:
         if (
             not self._convert_to_auto
             or not self._in_str_enum_class
-            or self._is_currently_ignored()
+            or self._is_ignored(original_node)
         ):
             return updated_node
         if updated_node.value is None or not isinstance(

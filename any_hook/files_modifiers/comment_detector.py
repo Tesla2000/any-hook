@@ -44,8 +44,13 @@ class CommentDetector(Modifier):
         compiled = tuple(re.compile(p) for p in self.patterns)
         visitor = _CommentDetectorVisitor(compiled)
         MetadataWrapper(file_data.module).visit(visitor)
-        if visitor.violations:
-            for comment, line_num in visitor.violations:
+        violations = [
+            (comment, line_num)
+            for comment, line_num in visitor.violations
+            if self.should_process_line(file_data.path, line_num)
+        ]
+        if violations:
+            for comment, line_num in violations:
                 self._output(
                     f"{file_data.path}:{line_num}: Forbidden comment detected: {comment}"
                 )
