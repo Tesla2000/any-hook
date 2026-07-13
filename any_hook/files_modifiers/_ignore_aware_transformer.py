@@ -1,8 +1,10 @@
 import re
+from collections.abc import Callable, Mapping
 from typing import Union
 
 from libcst import (
     ClassDef,
+    CSTNode,
     CSTTransformer,
     For,
     If,
@@ -12,6 +14,7 @@ from libcst import (
     While,
     With,
 )
+from libcst.metadata import CodeRange
 
 
 class IgnoreAwareTransformer(CSTTransformer):
@@ -20,6 +23,24 @@ class IgnoreAwareTransformer(CSTTransformer):
         self._ignore_pattern = ignore_pattern
         self._simple_line_ignored = False
         self._compound_ignored_stack: list[bool] = []
+        self._is_line_allowed: Callable[[int], bool] = lambda _: True
+        self._positions: Mapping[CSTNode, CodeRange] = {}
+
+    def configure_line_filter(
+        self,
+        is_line_allowed: Callable[[int], bool],
+        positions: Mapping[CSTNode, CodeRange],
+    ) -> None:
+        self._is_line_allowed = is_line_allowed
+        self._positions = positions
+
+    def _is_ignored(self, node: CSTNode) -> bool:
+        if self._is_currently_ignored():
+            return True
+        position = self._positions.get(node)
+        if position is None:
+            return False
+        return not self._is_line_allowed(position.start.line)
 
     def visit_SimpleStatementLine(self, node: SimpleStatementLine) -> bool:
         comment = node.trailing_whitespace.comment

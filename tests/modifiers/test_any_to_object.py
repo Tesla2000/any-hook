@@ -275,6 +275,18 @@ class TestAnyToObject(TransformerTestCase):
         """).lstrip()
         self._assert_transformation(code, expected)
 
+    def test_excluded_lines_leaves_specific_line_untouched(self):
+        code = "from typing import Any\nx: Any = 5\ny: Any = 6\n"
+        with TemporaryDirectory() as tmpdir:
+            test_file = Path(tmpdir) / "test.py"
+            test_file.write_text(code)
+            modifier = AnyToObject(excluded_lines=(f"{test_file}:3",))
+            file_data = FileData(
+                path=test_file, content=code, module=parse_module(code)
+            )
+            assert modifier.modify([file_data]) is True
+            assert test_file.read_text() == "x: object = 5\ny: Any = 6\n"
+
     def _create_transformer(self) -> CSTTransformer:
         return AnyToObject().create_transformer(
             re.compile(r"#\s*ignore", re.IGNORECASE)

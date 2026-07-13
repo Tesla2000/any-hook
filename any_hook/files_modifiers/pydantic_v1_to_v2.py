@@ -30,7 +30,7 @@ class _PydanticV1ToV2Transformer(IgnoreAwareTransformer):
     def leave_ImportFrom(
         self, original: ImportFrom, updated_node: ImportFrom
     ) -> ImportFrom:
-        if self._is_currently_ignored():
+        if self._is_ignored(original):
             return updated_node
         if not original.module:
             return updated_node
@@ -49,7 +49,7 @@ class _PydanticV1ToV2Transformer(IgnoreAwareTransformer):
         return updated_node
 
     def leave_Import(self, original: Import, updated_node: Import) -> Import:
-        if self._is_currently_ignored():
+        if self._is_ignored(original):
             return updated_node
         new_names = []
         made_change = False
@@ -78,9 +78,9 @@ class _PydanticV1ToV2Transformer(IgnoreAwareTransformer):
         return updated_node
 
     def leave_Attribute(
-        self, _: Attribute, updated_node: Attribute
+        self, original_node: Attribute, updated_node: Attribute
     ) -> Attribute:
-        if self._is_currently_ignored():
+        if self._is_ignored(original_node):
             return updated_node
         if not isinstance(updated_node.value, Attribute):
             return updated_node

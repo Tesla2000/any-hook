@@ -141,6 +141,40 @@ class TestLocalImports(TransformerTestCase):
             )
             assert not modifier.modify([file_data])
 
+    def test_excluded_lines_filters_specific_violation(self):
+        code = dedent("""
+            def foo():
+                import os
+                return os.path
+
+            def bar():
+                import sys
+                return sys.version
+        """).lstrip()
+        with TemporaryDirectory() as tmpdir:
+            test_file = Path(tmpdir) / "test.py"
+            test_file.write_text(code)
+            modifier = LocalImports(excluded_lines=(f"{test_file}:2",))
+            file_data = FileData(
+                path=test_file, content=code, module=parse_module(code)
+            )
+            assert modifier.modify([file_data])
+
+    def test_excluded_lines_filters_all_violations(self):
+        code = dedent("""
+            def foo():
+                import os
+                return os.path
+        """).lstrip()
+        with TemporaryDirectory() as tmpdir:
+            test_file = Path(tmpdir) / "test.py"
+            test_file.write_text(code)
+            modifier = LocalImports(excluded_lines=(f"{test_file}:2",))
+            file_data = FileData(
+                path=test_file, content=code, module=parse_module(code)
+            )
+            assert not modifier.modify([file_data])
+
     def _check_code(self, code: str) -> bool:
         file_data = FileData(
             path=Path("test.py"), content=code, module=parse_module(code)

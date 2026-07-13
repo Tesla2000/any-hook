@@ -108,6 +108,8 @@ class MarkAny(Modifier):
         for line_num in visitor.violations:
             if compiled_pattern.search(lines[line_num - 1]):
                 continue
+            if not self.should_process_line(file_data.path, line_num):
+                continue
             found = True
             self._output(f"{file_data.path}:{line_num}: Any usage detected")
         return found

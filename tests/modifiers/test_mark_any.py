@@ -99,6 +99,22 @@ class TestMarkAny:
             )
             assert not modifier.modify([file_data])
 
+    def test_excluded_lines_filters_specific_violation(self):
+        code = "from typing import Any\nx: Any = 5\ny: Any = 6\n"
+        with TemporaryDirectory() as tmpdir:
+            test_file = Path(tmpdir) / "test.py"
+            test_file.write_text(code)
+            recorder = RecordingOutput()
+            file_data = FileData(
+                path=test_file, content=code, module=parse_module(code)
+            )
+            modifier = MarkAny(
+                excluded_lines=(f"{test_file}:2",), outputs=(recorder,)
+            )
+            assert modifier.modify([file_data])
+            assert len(recorder.messages) == 1
+            assert ":3:" in recorder.messages[0]
+
     def test_output_includes_line_number(self):
         code = "from typing import Any\nx: Any = 5\n"
         recorder = RecordingOutput()
