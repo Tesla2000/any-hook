@@ -38,6 +38,8 @@ from any_hook.files_modifiers._import_adder import ModuleImportAdder
 from any_hook.files_modifiers.separate_modifier import SeparateModifier
 from any_hook.services import ClassHierarchyDetector
 
+_VALID_CONFIG_DICT_KEYS: frozenset[str] = frozenset(ConfigDict.__annotations__)
+
 
 class _PydanticConfigToModelConfigTransformer(IgnoreAwareTransformer):
     def __init__(
@@ -86,7 +88,18 @@ class _PydanticConfigToModelConfigTransformer(IgnoreAwareTransformer):
             updated_node, self._pydantic_base_names
         ):
             return updated_node
-        inline_args = list(updated_node.keywords)
+        inline_args = [
+            kw
+            for kw in updated_node.keywords
+            if kw.keyword is None
+            or kw.keyword.value in _VALID_CONFIG_DICT_KEYS
+        ]
+        non_config_keywords = [
+            kw
+            for kw in updated_node.keywords
+            if kw.keyword is not None
+            and kw.keyword.value not in _VALID_CONFIG_DICT_KEYS
+        ]
         new_body: list[CSTNode] = []
         has_model_config = False
         config_class_inserted = False
@@ -140,19 +153,25 @@ class _PydanticConfigToModelConfigTransformer(IgnoreAwareTransformer):
                     new_body, inline_args
                 )
             )
-            result = self._strip_keywords(updated_node, init_bases, last_base)
+            result = self._strip_keywords(
+                updated_node, init_bases, last_base, non_config_keywords
+            )
             self._made_changes = True
         elif (
             inline_args and not has_model_config and not config_class_inserted
         ):
             self._made_changes = True
-            result = self._strip_keywords(updated_node, init_bases, last_base)
+            result = self._strip_keywords(
+                updated_node, init_bases, last_base, non_config_keywords
+            )
             model_config_statement = SimpleStatementLine(
                 body=[self._create_model_config_assignment(inline_args)],
             )
             new_body.insert(0, model_config_statement)
         elif inline_args and not has_model_config and config_class_inserted:
-            result = self._strip_keywords(updated_node, init_bases, last_base)
+            result = self._strip_keywords(
+                updated_node, init_bases, last_base, non_config_keywords
+            )
         elif (
             not inline_args and has_model_config and not config_class_inserted
         ):
@@ -197,10 +216,18 @@ class _PydanticConfigToModelConfigTransformer(IgnoreAwareTransformer):
 
     @staticmethod
     def _strip_keywords(
-        node: ClassDef, init_bases: Sequence[Arg], last_base: Arg
+        node: ClassDef,
+        init_bases: Sequence[Arg],
+        last_base: Arg,
+        keywords_to_keep: Sequence[Arg] = (),
     ) -> ClassDef:
         new_last = last_base.with_changes(comma=MaybeSentinel.DEFAULT)
-        return node.with_changes(keywords=(), bases=[*init_bases, new_last])
+        kept = list(keywords_to_keep)
+        if kept:
+            kept[-1] = kept[-1].with_changes(comma=MaybeSentinel.DEFAULT)
+        return node.with_changes(
+            keywords=tuple(kept), bases=[*init_bases, new_last]
+        )
 
     @classmethod
     def _merge_inline_args_into_model_config(
