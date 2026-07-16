@@ -1061,6 +1061,70 @@ class TestPydanticConfigModifyFile:
         assert result
 
 
+class TestNonConfigDictKeywordsPreserved(TransformerTestCase):
+    def test_metaclass_preserved_config_kwarg_moved(self):
+        code = dedent("""
+            from pydantic import BaseModel
+            class User(BaseModel, metaclass=SomeMeta, frozen=True):
+                name: str
+        """).lstrip()
+        expected = dedent("""
+            from typing import ClassVar
+            from pydantic import BaseModel, ConfigDict
+            class User(BaseModel, metaclass=SomeMeta):
+                model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+                name: str
+        """).lstrip()
+        self._assert_transformation(code, expected)
+
+    def test_metaclass_only_stays_untouched(self):
+        code = dedent("""
+            from pydantic import BaseModel
+            class User(BaseModel, metaclass=SomeMeta):
+                name: str
+        """).lstrip()
+        self._assert_no_transformation(code)
+
+    def test_metaclass_preserved_with_config_class(self):
+        code = dedent("""
+            from pydantic import BaseModel
+            class User(BaseModel, metaclass=SomeMeta, frozen=True):
+                name: str
+                class Config:
+                    extra = "forbid"
+        """).lstrip()
+        expected = dedent("""
+            from typing import ClassVar
+            from pydantic import BaseModel, ConfigDict
+            class User(BaseModel, metaclass=SomeMeta):
+                name: str
+                model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="forbid")
+        """).lstrip()
+        self._assert_transformation(code, expected)
+
+    def test_metaclass_preserved_with_existing_model_config(self):
+        code = dedent("""
+            from pydantic import BaseModel, ConfigDict
+            from typing import ClassVar
+            class User(BaseModel, metaclass=SomeMeta, frozen=True):
+                model_config: ClassVar[ConfigDict] = ConfigDict(extra="allow")
+                name: str
+        """).lstrip()
+        expected = dedent("""
+            from pydantic import BaseModel, ConfigDict
+            from typing import ClassVar
+            class User(BaseModel, metaclass=SomeMeta):
+                model_config: ClassVar[ConfigDict] = ConfigDict(extra="allow", frozen=True)
+                name: str
+        """).lstrip()
+        self._assert_transformation(code, expected)
+
+    def _create_transformer(self) -> CSTTransformer:
+        return PydanticConfigToModelConfig().create_transformer(
+            re.compile(r"#\s*ignore", re.IGNORECASE)
+        )
+
+
 class TestPydanticConfigStripKeywords(TransformerTestCase):
     def test_inline_kwargs_with_non_pydantic_base_unchanged(self):
         code = dedent("""
