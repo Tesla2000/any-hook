@@ -24,18 +24,20 @@ def _extract_annotated_exceptions(
     return frozenset(name for name in names if name is not None)
 
 
-def _builtin_type(name: str) -> type | None:
-    candidate = vars(builtins).get(name)
-    return candidate if isinstance(candidate, type) else None
+_BUILTIN_EXCEPTIONS: dict[str, type[BaseException]] = {
+    name: obj
+    for name, obj in vars(builtins).items()
+    if isinstance(obj, type) and issubclass(obj, BaseException)
+}
 
 
 def _is_covered(raised: str, declared: frozenset[str]) -> bool:
     if raised in declared:
         return True
-    raised_type = _builtin_type(raised)
+    raised_type = _BUILTIN_EXCEPTIONS.get(raised)
     if raised_type is None:
         return False
-    declared_types = (_builtin_type(name) for name in declared)
+    declared_types = (_BUILTIN_EXCEPTIONS.get(name) for name in declared)
     return any(
         declared_type is not None and issubclass(raised_type, declared_type)
         for declared_type in declared_types
