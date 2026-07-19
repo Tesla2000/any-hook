@@ -31,6 +31,7 @@ from any_hook.files_modifiers.pydantic_config_to_model_config import (
     PydanticConfigToModelConfig,
 )
 from any_hook.files_modifiers.pydantic_v1_to_v2 import PydanticV1ToV2
+from any_hook.files_modifiers.raise_annotation_check import RaiseAnnotationCheck
 from any_hook.files_modifiers.remove_f_prefix import RemoveFPrefix
 from any_hook.files_modifiers.return_tuple_parens_drop import (
     ReturnTupleParensDrop,
@@ -67,6 +68,7 @@ _modifier_types: list[type] = [
     ArbitraryTypesAllowedCheck,
     InstanceOfPydanticModelDetector,
     MarkAny,
+    RaiseAnnotationCheck,
 ]
 __all__ = [
     "Modifier",
@@ -95,6 +97,7 @@ __all__ = [
     "ArbitraryTypesAllowedCheck",
     "InstanceOfPydanticModelDetector",
     "MarkAny",
+    "RaiseAnnotationCheck",
     "AnyModifier",
 ]
 try:
@@ -147,6 +150,7 @@ if TYPE_CHECKING:
             ArbitraryTypesAllowedCheck,
             InstanceOfPydanticModelDetector,
             MarkAny,
+            RaiseAnnotationCheck,
             WorkflowEnvToExample,
             GenerateStubs,
         ],

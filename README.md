@@ -31,6 +31,7 @@ A collection of customizable pre-commit hooks for Python code quality and transf
   - [open-to-path](#open-to-path)
   - [pydantic-config-to-model-config](#pydantic-config-to-model-config)
   - [pydantic-v1-to-v2](#pydantic-v1-to-v2)
+  - [raise-annotation-check](#raise-annotation-check)
   - [remove-f-prefix](#remove-f-prefix)
   - [return-tuple-parens-drop](#return-tuple-parens-drop)
   - [str-enum-inheritance](#str-enum-inheritance)
@@ -516,6 +517,51 @@ def validate_name(cls, v):
 @classmethod
 def validate_all(cls, v):
     return cls._clean(v)
+```
+
+### raise-annotation-check
+
+Detects undocumented and unhandled exceptions.
+
+**What it does:**
+- Reports functions that `raise` an exception not listed in their `Annotated[T, ExcA, ExcB]` return type (including a function that raises but has no `Annotated` return at all)
+- Reports calls to such Annotated functions — in the same file, or imported from a local module — that are neither wrapped in a matching `try/except` nor re-declared in the caller's own `Annotated` return
+- Only checks one level deep: calls made directly in the caller's body, not calls made further down by the callee
+- A bare `except Exception` (or another builtin superclass) counts as handling any builtin subclass of it
+- Only detects simple calls like `func()` and bare re-raises inside a typed `except` clause; method calls (`obj.func()`) and bare `except:` re-raises are not resolved
+
+**Options:**
+- `source_roots` (default `(".",)`) — root directories used to resolve local module imports
+- `extra_sys_path` (default `()`) — additional import search paths (e.g. a target project's virtualenv site-packages)
+
+**Example:**
+```python
+# Flagged — raises ValueError but it's not declared
+def parse(value: str) -> str:
+    if not value:
+        raise ValueError("empty")
+    return value
+
+# Flagged — call to parse() is not guarded and load() doesn't propagate it either
+def parse(value: str) -> Annotated[str, ValueError]:
+    if not value:
+        raise ValueError("empty")
+    return value
+
+def load(value: str) -> str:
+    return parse(value)
+
+# OK — exception is declared and handled
+def load(value: str) -> str:
+    try:
+        return parse(value)
+    except ValueError:
+        return ""
+```
+
+**Configuration:**
+```json
+{"type": "raise-annotation-check"}
 ```
 
 ### arbitrary-types-allowed-check
