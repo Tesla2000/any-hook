@@ -29,6 +29,7 @@ from any_hook.services import (
 from any_hook.services._class_hierarchy_detector import _extract_base_name
 
 _Positions = Mapping[CSTNode, CodeRange]
+_UNRESOLVED_RERAISE = "<unresolved>"
 
 
 def _handler_exception_names(
@@ -72,7 +73,8 @@ class _RaiseCollector(CSTVisitor):
 
     def _resolve_raised(self, node: Raise) -> frozenset[str]:
         if node.exc is None:
-            return self._caught_stack[-1] if self._caught_stack else frozenset()
+            caught = self._caught_stack[-1] if self._caught_stack else frozenset()
+            return caught if caught else frozenset({_UNRESOLVED_RERAISE})
         target = node.exc.func if isinstance(node.exc, Call) else node.exc
         name = _extract_base_name(target)
         return frozenset({name}) if name is not None else frozenset()
@@ -177,6 +179,12 @@ class RaiseAnnotationCheck(Modifier):
             ...         return parse(value)
             ...     except ValueError:
             ...         return ""
+
+    Note:
+        A bare `raise` inside a bare `except:` (or with no enclosing
+        handler at all) can't be resolved to a specific exception type.
+        This is a known limitation, so it is always reported as a
+        violation rather than silently skipped.
     """
 
     type: Literal["raise-annotation-check"] = "raise-annotation-check"
@@ -230,11 +238,20 @@ class RaiseAnnotationCheck(Modifier):
             if not self._should_report(file_data, line, lines, ignore_pattern):
                 continue
             self._output(
-                f"{file_data.path}:{line}: {func.name} raises {name} "
-                "not declared in Annotated return"
+                f"{file_data.path}:{line}: {self._raise_message(func.name, name)}"
             )
             violated = True
         return violated
+
+    @staticmethod
+    def _raise_message(function_name: str, name: str) -> str:
+        if name == _UNRESOLVED_RERAISE:
+            return (
+                f"{function_name} re-raises inside a bare 'except:' — the "
+                "exception type can't be resolved statically; declare it "
+                "explicitly in the Annotated return"
+            )
+        return f"{function_name} raises {name} not declared in Annotated return"
 
     def _check_calls(
         self,

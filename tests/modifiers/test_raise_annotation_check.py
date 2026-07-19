@@ -53,7 +53,7 @@ class TestRaiseAnnotationCheck:
         """).lstrip()
         assert self._check_code(code)
 
-    def test_bare_reraise_inside_bare_except_is_not_flagged(self):
+    def test_bare_reraise_inside_bare_except_is_flagged_as_unresolved(self):
         code = dedent("""
             def parse(value: str) -> str:
                 try:
@@ -61,7 +61,30 @@ class TestRaiseAnnotationCheck:
                 except:
                     raise
         """).lstrip()
-        assert not self._check_code(code)
+        assert self._check_code(code)
+
+    def test_bare_reraise_with_no_enclosing_except_is_flagged_as_unresolved(self):
+        code = dedent("""
+            def parse(value: str) -> str:
+                raise
+        """).lstrip()
+        assert self._check_code(code)
+
+    def test_bare_reraise_inside_bare_except_message_explains_limitation(self):
+        code = dedent("""
+            def parse(value: str) -> str:
+                try:
+                    return int(value)
+                except:
+                    raise
+        """).lstrip()
+        recorder = RecordingOutput()
+        file_data = FileData(
+            path=Path("test.py"), content=code, module=parse_module(code)
+        )
+        RaiseAnnotationCheck(outputs=(recorder,)).modify([file_data])
+        assert "bare 'except:'" in recorder.messages[0]
+        assert "<unresolved>" not in recorder.messages[0]
 
     def test_flags_unguarded_call_to_annotated_function(self):
         code = dedent("""

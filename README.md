@@ -528,7 +528,8 @@ Detects undocumented and unhandled exceptions.
 - Reports calls to such Annotated functions — in the same file, or imported from a local module — that are neither wrapped in a matching `try/except` nor re-declared in the caller's own `Annotated` return
 - Only checks one level deep: calls made directly in the caller's body, not calls made further down by the callee
 - A bare `except Exception` (or another builtin superclass) counts as handling any builtin subclass of it
-- Only detects simple calls like `func()` and bare re-raises inside a typed `except` clause; method calls (`obj.func()`) and bare `except:` re-raises are not resolved
+- Only detects simple calls like `func()`; method calls (`obj.func()`) are not resolved
+- A bare `raise` inside a bare `except:` (or with no enclosing handler at all) can't be resolved to a specific exception type — this is a known limitation, so it's always flagged as a violation rather than silently skipped
 
 **Options:**
 - `source_roots` (default `(".",)`) — root directories used to resolve local module imports
