@@ -68,6 +68,11 @@ class _ImportPathTracker:
     ) -> bool:
         return self._resolve(name, module, file_path, target_bases, set())
 
+    def resolve_import(
+        self, name: str, module: Module, file_path: Path
+    ) -> tuple[str, Module, Path] | None:
+        return self._resolve_import(name, module, file_path)
+
     def _resolve(
         self,
         name: str,
