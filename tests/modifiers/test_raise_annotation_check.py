@@ -7,7 +7,9 @@ from textwrap import dedent
 from libcst import parse_module
 
 from any_hook import FileData
-from any_hook.files_modifiers.raise_annotation_check import RaiseAnnotationCheck
+from any_hook.files_modifiers.raise_annotation_check import (
+    RaiseAnnotationCheck,
+)
 from tests.modifiers._base import RecordingOutput
 
 
@@ -63,7 +65,9 @@ class TestRaiseAnnotationCheck:
         """).lstrip()
         assert self._check_code(code)
 
-    def test_bare_reraise_with_no_enclosing_except_is_flagged_as_unresolved(self):
+    def test_bare_reraise_with_no_enclosing_except_is_flagged_as_unresolved(
+        self,
+    ):
         code = dedent("""
             def parse(value: str) -> str:
                 raise
@@ -85,6 +89,81 @@ class TestRaiseAnnotationCheck:
         RaiseAnnotationCheck(outputs=(recorder,)).modify([file_data])
         assert "bare 'except:'" in recorder.messages[0]
         assert "<unresolved>" not in recorder.messages[0]
+
+    def test_multi_exception_except_tuple_counts_both_as_raised(self):
+        code = dedent("""
+            def parse(value: str) -> str:
+                try:
+                    return int(value)
+                except (ValueError, TypeError):
+                    raise
+        """).lstrip()
+        assert self._check_code(code)
+
+    def test_nested_def_and_lambda_are_not_attributed_to_outer_function(self):
+        code = dedent("""
+            from typing import Annotated
+
+            def outer(value: str) -> str:
+                transform = lambda item: item
+
+                def helper() -> Annotated[str, ValueError]:
+                    if not value:
+                        raise ValueError("empty")
+                    return value
+
+                try:
+                    return helper()
+                except ValueError:
+                    return transform(value)
+        """).lstrip()
+        assert not self._check_code(code)
+
+    def test_method_call_is_not_treated_as_a_direct_call(self):
+        code = dedent("""
+            def load(value: str) -> str:
+                return value.strip()
+        """).lstrip()
+        assert not self._check_code(code)
+
+    def test_orelse_and_finally_calls_are_not_protected_by_try_handlers(self):
+        code = dedent("""
+            from typing import Annotated
+
+            def parse(value: str) -> Annotated[str, ValueError]:
+                if not value:
+                    raise ValueError("empty")
+                return value
+
+            def load(value: str) -> str:
+                try:
+                    value = value.strip()
+                except OSError:
+                    return ""
+                else:
+                    return parse(value)
+                finally:
+                    parse(value)
+        """).lstrip()
+        assert self._check_code(code)
+
+    def test_excluded_lines_suppresses_call_violation(self):
+        code = dedent("""
+            from typing import Annotated
+
+            def parse(value: str) -> Annotated[str, ValueError]:
+                if not value:
+                    raise ValueError("empty")
+                return value
+
+            def load(value: str) -> str:
+                return parse(value)
+        """).lstrip()
+        file_data = FileData(
+            path=Path("test.py"), content=code, module=parse_module(code)
+        )
+        modifier = RaiseAnnotationCheck(excluded_lines=("test.py:9",))
+        assert not modifier.modify([file_data])
 
     def test_flags_unguarded_call_to_annotated_function(self):
         code = dedent("""

@@ -3,8 +3,8 @@ from any_hook.services._class_hierarchy_detector import (
 )
 from any_hook.services._exception_annotation import (
     _extract_annotated_exceptions as extract_annotated_exceptions,
-    _is_covered as is_covered,
 )
+from any_hook.services._exception_annotation import _is_covered as is_covered
 from any_hook.services._exception_annotation_resolver import (
     _ExceptionAnnotationResolver as ExceptionAnnotationResolver,
 )

@@ -25,7 +25,7 @@ def _extract_annotated_exceptions(
 
 
 def _builtin_type(name: str) -> type | None:
-    candidate = getattr(builtins, name, None)
+    candidate = vars(builtins).get(name)
     return candidate if isinstance(candidate, type) else None
 
 

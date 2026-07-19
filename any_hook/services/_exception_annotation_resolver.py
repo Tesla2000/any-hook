@@ -2,7 +2,9 @@ from pathlib import Path
 
 from libcst import FunctionDef, Module
 
-from any_hook.services._exception_annotation import _extract_annotated_exceptions
+from any_hook.services._exception_annotation import (
+    _extract_annotated_exceptions,
+)
 from any_hook.services._import_path_tracker import _ImportPathTracker
 
 

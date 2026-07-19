@@ -39,7 +39,8 @@ def _handler_exception_names(
         return frozenset()
     if isinstance(handler_type, Tuple):
         names = (
-            _extract_base_name(element.value) for element in handler_type.elements
+            _extract_base_name(element.value)
+            for element in handler_type.elements
         )
         return frozenset(name for name in names if name is not None)
     name = _extract_base_name(handler_type)
@@ -73,7 +74,9 @@ class _RaiseCollector(CSTVisitor):
 
     def _resolve_raised(self, node: Raise) -> frozenset[str]:
         if node.exc is None:
-            caught = self._caught_stack[-1] if self._caught_stack else frozenset()
+            caught = (
+                self._caught_stack[-1] if self._caught_stack else frozenset()
+            )
             return caught if caught else frozenset({_UNRESOLVED_RERAISE})
         target = node.exc.func if isinstance(node.exc, Call) else node.exc
         name = _extract_base_name(target)
@@ -96,7 +99,9 @@ class _CallProtectionVisitor(CSTVisitor):
     def visit_Call(self, node: Call) -> bool:
         if isinstance(node.func, Name):
             protected = (
-                self._protected_stack[-1] if self._protected_stack else frozenset()
+                self._protected_stack[-1]
+                if self._protected_stack
+                else frozenset()
             )
             line = self._positions[node].start.line
             self.calls.append((node.func.value, line, protected))
@@ -104,9 +109,14 @@ class _CallProtectionVisitor(CSTVisitor):
 
     def visit_Try(self, node: Try) -> bool:
         handled = frozenset[str]().union(
-            *(_handler_exception_names(handler.type) for handler in node.handlers)
+            *(
+                _handler_exception_names(handler.type)
+                for handler in node.handlers
+            )
         )
-        outer = self._protected_stack[-1] if self._protected_stack else frozenset()
+        outer = (
+            self._protected_stack[-1] if self._protected_stack else frozenset()
+        )
         self._protected_stack.append(outer | handled)
         node.body.visit(self)
         self._protected_stack.pop()
@@ -142,7 +152,10 @@ class _FunctionCollector(CSTVisitor):
         )
         self.functions.append(
             _FunctionInfo(
-                node.name.value, declared, raise_collector.raised, call_visitor.calls
+                node.name.value,
+                declared,
+                raise_collector.raised,
+                call_visitor.calls,
             )
         )
         return True
@@ -217,10 +230,17 @@ class RaiseAnnotationCheck(Modifier):
         )
         violated = False
         for func in collector.functions:
-            violated |= self._check_raises(file_data, func, lines, ignore_pattern)
+            violated |= self._check_raises(
+                file_data, func, lines, ignore_pattern
+            )
         for func in collector.functions:
             violated |= self._check_calls(
-                file_data, func, declared_by_name, resolver, lines, ignore_pattern
+                file_data,
+                func,
+                declared_by_name,
+                resolver,
+                lines,
+                ignore_pattern,
             )
         return violated
 
@@ -251,7 +271,9 @@ class RaiseAnnotationCheck(Modifier):
                 "exception type can't be resolved statically; declare it "
                 "explicitly in the Annotated return"
             )
-        return f"{function_name} raises {name} not declared in Annotated return"
+        return (
+            f"{function_name} raises {name} not declared in Annotated return"
+        )
 
     def _check_calls(
         self,
@@ -273,7 +295,9 @@ class RaiseAnnotationCheck(Modifier):
                 continue
             covered = protected | func.declared
             unhandled = sorted(
-                name for name in callee_exceptions if not is_covered(name, covered)
+                name
+                for name in callee_exceptions
+                if not is_covered(name, covered)
             )
             if not unhandled:
                 continue
